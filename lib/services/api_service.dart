@@ -1,0 +1,133 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
+import '../models/user.dart';
+import '../models/translation.dart';
+
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final String? code;
+
+  ApiException(this.message, {this.statusCode, this.code});
+
+  @override
+  String toString() => message;
+}
+
+class ApiService {
+  String? _accessToken;
+
+  void setToken(String token) {
+    _accessToken = token;
+  }
+
+  void clearToken() {
+    _accessToken = null;
+  }
+
+  Map<String, String> get _headers {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (_accessToken != null) {
+      headers['Authorization'] = 'Bearer $_accessToken';
+    }
+    return headers;
+  }
+
+  Future<User> register({
+    required String email,
+    required String username,
+    required String password,
+    required String fullName,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/register'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'email': email,
+        'username': username,
+        'password': password,
+        'full_name': fullName,
+      }),
+    );
+
+    if (response.statusCode == 201) {
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      final error = jsonDecode(response.body);
+      throw ApiException(
+        error['detail'] ?? 'Registration failed',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
+  Future<AuthTokens> login({
+    required String username,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'username': username, 'password': password}),
+    );
+
+    if (response.statusCode == 200) {
+      return AuthTokens.fromJson(jsonDecode(response.body));
+    } else {
+      final error = jsonDecode(response.body);
+      throw ApiException(
+        error['detail'] ?? 'Login failed',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
+  Future<User> getCurrentUser() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/me'),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      return User.fromJson(jsonDecode(response.body));
+    } else {
+      throw ApiException('Failed to get user', statusCode: response.statusCode);
+    }
+  }
+
+  Future<List<Translation>> getTranslationHistory({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final response = await http.get(
+      Uri.parse(
+        '${ApiConfig.baseUrl}/api/translation?limit=$limit&offset=$offset',
+      ),
+      headers: _headers,
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return data.map((json) => Translation.fromJson(json)).toList();
+    } else {
+      throw ApiException(
+        'Failed to get translation history',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> healthCheck() async {
+    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/health'));
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw ApiException(
+        'Health check failed',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+}
