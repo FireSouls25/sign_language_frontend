@@ -1,18 +1,11 @@
 import 'package:google_sign_in/google_sign_in.dart';
-import '../config/api_config.dart';
 
 class GoogleAuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: _getServerClientId(),
+    serverClientId:
+        '908648917103-g1q1qh4f8bln3fukvd3h335a1g1bieak.apps.googleusercontent.com',
     scopes: ['email', 'profile'],
   );
-
-  static String? _getServerClientId() {
-    if (ApiConfig.isProduction) {
-      return null;
-    }
-    return null;
-  }
 
   Future<GoogleSignInResult> signIn() async {
     try {
