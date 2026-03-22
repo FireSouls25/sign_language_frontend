@@ -1,40 +1,42 @@
-import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_appauth/flutter_appauth.dart';
+
+const String _clientId =
+    '908648917103-g1q1qh4f8bln3fukvd3h335a1g1bieak.apps.googleusercontent.com';
+const String _redirectUrl = 'com.example.sign_frontend:/oauth2redirect';
+const String _discoveryUrl =
+    'https://accounts.google.com/.well-known/openid-configuration';
 
 class GoogleAuthService {
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId:
-        '908648917103-g1q1qh4f8bln3fukvd3h335a1g1bieak.apps.googleusercontent.com',
-    scopes: ['email', 'profile'],
-  );
+  final FlutterAppAuth _appAuth = const FlutterAppAuth();
 
   Future<GoogleSignInResult> signIn() async {
     try {
-      final account = await _googleSignIn.signIn();
+      final result = await _appAuth.authorizeAndExchangeCode(
+        AuthorizationTokenRequest(
+          _clientId,
+          _redirectUrl,
+          discoveryUrl: _discoveryUrl,
+          scopes: ['email', 'profile', 'openid'],
+        ),
+      );
 
-      if (account == null) {
-        return GoogleSignInResult(success: false, error: 'Sign in cancelled');
+      if (result == null) {
+        return GoogleSignInResult(success: false, error: 'sign_in_cancelled');
       }
-
-      final auth = await account.authentication;
 
       return GoogleSignInResult(
         success: true,
-        idToken: auth.idToken,
-        accessToken: auth.accessToken,
-        email: account.email,
-        displayName: account.displayName,
-        photoUrl: account.photoUrl,
+        idToken: result.idToken,
+        accessToken: result.accessToken,
       );
     } catch (e) {
-      return GoogleSignInResult(success: false, error: e.toString());
+      final error = e.toString();
+      if (error.contains('cancel') || error.contains('dismiss')) {
+        return GoogleSignInResult(success: false, error: 'sign_in_cancelled');
+      }
+      return GoogleSignInResult(success: false, error: error);
     }
   }
-
-  Future<void> signOut() async {
-    await _googleSignIn.signOut();
-  }
-
-  bool get isSignedIn => _googleSignIn.currentUser != null;
 }
 
 class GoogleSignInResult {
