@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
 import '../models/translation.dart';
 import '../services/translation_repository.dart';
 import '../providers/auth_provider.dart';
@@ -93,7 +93,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (audioUrl == null || audioUrl.isEmpty) return;
 
     try {
-      await _audioPlayer.play(UrlSource(audioUrl));
+      await _audioPlayer.setUrl(audioUrl);
+      await _audioPlayer.play();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
