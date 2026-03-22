@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:audioplayers/audioplayers.dart';
 import '../models/translation.dart';
-import '../services/api_service.dart';
+import '../services/translation_repository.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/ls_app_bar.dart';
 
@@ -14,34 +14,78 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  final ApiService _apiService = ApiService();
+  late final TranslationRepository _repository;
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   List<Translation> _translations = [];
   bool _isLoading = true;
+  bool _isSyncing = false;
   String? _error;
+  bool _isOffline = false;
 
   @override
   void initState() {
     super.initState();
+    _repository = TranslationRepository();
     _loadHistory();
   }
 
-  Future<void> _loadHistory() async {
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadHistory({bool forceRefresh = false}) async {
     final authProvider = context.read<AuthProvider>();
-    _apiService.setToken(authProvider.accessToken!);
+    if (authProvider.accessToken == null) return;
+
+    _repository.setToken(authProvider.accessToken!);
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
-      final translations = await _apiService.getTranslationHistory();
+      final translations = await _repository.getTranslations(
+        forceRefresh: forceRefresh,
+      );
       setState(() {
         _translations = translations;
         _isLoading = false;
+        _isOffline = false;
       });
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
+        _isOffline = true;
       });
+    }
+  }
+
+  Future<void> _syncFromServer() async {
+    final authProvider = context.read<AuthProvider>();
+    if (authProvider.accessToken == null) return;
+
+    _repository.setToken(authProvider.accessToken!);
+
+    setState(() => _isSyncing = true);
+
+    try {
+      await _repository.syncFromServer();
+      await _loadHistory(forceRefresh: true);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al sincronizar: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
     }
   }
 
@@ -59,45 +103,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const LSAppBar(title: 'Historial de Traducciones'),
-      body: _buildBody(),
-    );
-  }
-
   Widget _buildBody() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error != null) {
+    if (_error != null && _translations.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              _error!,
-              style: const TextStyle(color: Colors.red),
-              textAlign: TextAlign.center,
-            ),
+            Icon(Icons.cloud_off, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _isLoading = true;
-                  _error = null;
-                });
-                _loadHistory();
-              },
-              child: const Text('Reintentar'),
+            Text(
+              _isOffline ? 'Sin conexión a internet' : 'Error al cargar',
+              style: const TextStyle(fontSize: 18),
+            ),
+            if (_isOffline) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Mostrando datos guardados localmente',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _isOffline
+                  ? _syncFromServer
+                  : () => _loadHistory(forceRefresh: true),
+              icon: Icon(_isOffline ? Icons.sync : Icons.refresh),
+              label: Text(_isOffline ? 'Sincronizar' : 'Reintentar'),
             ),
           ],
         ),
@@ -105,89 +140,119 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     if (_translations.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
+            Icon(Icons.history, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text(
               'Aún no hay historial de traducciones',
               style: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _syncFromServer,
+              icon: const Icon(Icons.sync),
+              label: const Text('Sincronizar'),
             ),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _translations.length,
-      itemBuilder: (context, index) {
-        final translation = _translations[index];
-        return _buildTranslationCard(translation);
-      },
+    return RefreshIndicator(
+      onRefresh: () => _loadHistory(forceRefresh: true),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _translations.length,
+        itemBuilder: (context, index) {
+          final translation = _translations[index];
+          return _buildTranslationCard(translation);
+        },
+      ),
     );
   }
 
   Widget _buildTranslationCard(Translation translation) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    translation.textResult,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+    return Dismissible(
+      key: Key(translation.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 16),
+        color: Colors.red,
+        child: const Icon(Icons.delete, color: Colors.white),
+      ),
+      onDismissed: (_) async {
+        await _repository.deleteTranslation(translation.id);
+        setState(() {
+          _translations.removeWhere((t) => t.id == translation.id);
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Traducción eliminada')));
+        }
+      },
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      translation.textResult,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                if (translation.audioUrl != null)
-                  IconButton(
-                    icon: const Icon(Icons.volume_up),
-                    color: Colors.deepPurple,
-                    onPressed: () => _playAudio(translation.audioUrl),
+                  if (translation.audioUrl != null)
+                    IconButton(
+                      icon: const Icon(Icons.volume_up),
+                      color: Colors.deepPurple,
+                      onPressed: () => _playAudio(translation.audioUrl),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formatDate(translation.createdAt),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _formatDate(translation.createdAt),
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getConfidenceColor(translation.confidenceScore),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${(translation.confidenceScore * 100).toStringAsFixed(0)}%',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getConfidenceColor(translation.confidenceScore),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${(translation.confidenceScore * 100).toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -212,5 +277,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: LSAppBar(
+        title: 'Historial de Traducciones',
+        actions: [
+          if (_isSyncing)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.sync),
+              onPressed: _syncFromServer,
+              tooltip: 'Sincronizar',
+            ),
+        ],
+      ),
+      body: _buildBody(),
+    );
   }
 }

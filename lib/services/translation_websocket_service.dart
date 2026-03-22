@@ -10,7 +10,7 @@ typedef ConnectionCallback = void Function();
 
 class TranslationWebSocketService {
   WebSocketChannel? _channel;
-  StreamSubscription? _subscription;
+  StreamSubscription<dynamic>? _subscription;
 
   final _translationController =
       StreamController<TranslationResult>.broadcast();
@@ -36,7 +36,7 @@ class TranslationWebSocketService {
         : ApiConfig.wsUrl;
 
     _isConnecting = true;
-    _connectionController.add(false); // Estamos en proceso de conectar
+    _connectionController.add(false);
 
     try {
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -45,6 +45,7 @@ class TranslationWebSocketService {
         _onMessage,
         onError: _onError,
         onDone: _onDone,
+        cancelOnError: false,
       );
 
       _isConnected = true;
@@ -117,10 +118,13 @@ class TranslationWebSocketService {
 
   Future<void> disconnect() async {
     await _subscription?.cancel();
+    _subscription = null;
+
     await _channel?.sink.close();
     _channel = null;
-    _subscription = null;
+
     _isConnected = false;
+    _isConnecting = false;
     _connectionController.add(false);
   }
 

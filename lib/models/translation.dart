@@ -25,6 +25,46 @@ class Translation {
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
+
+  factory Translation.fromMap(Map<String, dynamic> map) {
+    return Translation(
+      id: map['id'] as String,
+      userId: map['user_id'] as String,
+      textResult: map['text_result'] as String,
+      audioUrl: map['audio_url'] as String?,
+      confidenceScore: (map['confidence_score'] as num).toDouble(),
+      createdAt: DateTime.parse(map['created_at'] as String),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'text_result': textResult,
+      'audio_url': audioUrl,
+      'confidence_score': confidenceScore,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+
+  Translation copyWith({
+    String? id,
+    String? userId,
+    String? textResult,
+    String? audioUrl,
+    double? confidenceScore,
+    DateTime? createdAt,
+  }) {
+    return Translation(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      textResult: textResult ?? this.textResult,
+      audioUrl: audioUrl ?? this.audioUrl,
+      confidenceScore: confidenceScore ?? this.confidenceScore,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }
 
 class TranslationResult {
