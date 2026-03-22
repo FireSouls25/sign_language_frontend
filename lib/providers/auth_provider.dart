@@ -221,4 +221,28 @@ class AuthProvider extends ChangeNotifier {
     await prefs.setBool('is_voice_enabled', enabled);
     notifyListeners();
   }
+
+  Future<(bool, String?)> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _apiService.changePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      _isLoading = false;
+      notifyListeners();
+      return (true, null);
+    } catch (e) {
+      _error = e.toString();
+      _isLoading = false;
+      notifyListeners();
+      return (false, _error);
+    }
+  }
 }

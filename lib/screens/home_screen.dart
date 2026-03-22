@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
 import '../services/translation_websocket_service.dart';
+import '../widgets/ls_app_bar.dart';
 import 'login_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
@@ -207,27 +208,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-        centerTitle: true,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Traductor LSC'),
-            const SizedBox(width: 8),
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _wsService.isConnected
-                    ? Colors.greenAccent
-                    : (_wsService.isConnecting ? Colors.orange : Colors.red),
-              ),
-            ),
-          ],
-        ),
+      appBar: LSAppBar(
+        title: 'Traductor LSC',
+        showConnectionIndicator: true,
+        isConnected: _wsService.isConnected,
+        isConnecting: _wsService.isConnecting,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),

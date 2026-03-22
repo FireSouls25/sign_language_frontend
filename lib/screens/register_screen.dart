@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/ls_app_bar.dart';
 import 'home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -51,11 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Crear Cuenta'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
+      appBar: const LSAppBar(title: 'Crear Cuenta'),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

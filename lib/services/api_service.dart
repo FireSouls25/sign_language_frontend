@@ -132,6 +132,30 @@ class ApiService {
     } catch (_) {}
   }
 
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('${ApiConfig.baseUrl}/api/auth/change-password'),
+          headers: _headers,
+          body: jsonEncode({
+            'current_password': currentPassword,
+            'new_password': newPassword,
+          }),
+        )
+        .timeout(_timeout);
+
+    if (response.statusCode != 200) {
+      final error = jsonDecode(response.body);
+      throw ApiException(
+        error['detail'] ?? 'Failed to change password',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
   Future<List<Translation>> getTranslationHistory({
     int limit = 20,
     int offset = 0,

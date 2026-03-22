@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../models/translation.dart';
 import '../services/api_service.dart';
 import '../providers/auth_provider.dart';
+import '../widgets/ls_app_bar.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -51,9 +52,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
       await _audioPlayer.play(UrlSource(audioUrl));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Falló la reproducción del audio')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Falló la reproducción del audio')),
+        );
       }
     }
   }
@@ -67,11 +68,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Historial de Traducciones'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
+      appBar: const LSAppBar(title: 'Historial de Traducciones'),
       body: _buildBody(),
     );
   }

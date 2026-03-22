@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../widgets/ls_app_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,10 +18,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = authProvider.user;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mi Perfil'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
+      appBar: const LSAppBar(
+        title: 'Mi Perfil',
+        automaticallyImplyLeading: true,
       ),
       body: user == null
           ? const Center(child: CircularProgressIndicator())
@@ -33,7 +33,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     radius: 50,
                     backgroundColor: Colors.deepPurple,
                     child: Text(
-                      user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+                      user.fullName.isNotEmpty
+                          ? user.fullName[0].toUpperCase()
+                          : '?',
                       style: const TextStyle(fontSize: 40, color: Colors.white),
                     ),
                   ),
@@ -41,8 +43,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(
                     user.fullName,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
                     '@${user.username}',
@@ -65,7 +67,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   SwitchListTile(
                     title: const Text('Reproducción de Voz (TTS)'),
-                    subtitle: const Text('Escuchar la traducción automáticamente'),
+                    subtitle: const Text(
+                      'Escuchar la traducción automáticamente',
+                    ),
                     value: authProvider.isVoiceEnabled,
                     activeColor: Colors.deepPurple,
                     onChanged: (bool value) {
@@ -79,9 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     leading: const Icon(Icons.lock_outline),
                     title: const Text('Cambiar Contraseña'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      _showChangePasswordDialog();
-                    },
+                    onTap: () => _showChangePasswordDialog(),
                   ),
                   const SizedBox(height: 40),
                   SizedBox(
@@ -90,7 +92,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onPressed: () async {
                         await authProvider.logout();
                         if (mounted) {
-                          Navigator.of(context).popUntil((route) => route.isFirst);
+                          Navigator.of(
+                            context,
+                          ).popUntil((route) => route.isFirst);
                         }
                       },
                       icon: const Icon(Icons.logout),
@@ -129,51 +133,143 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Icon(icon, color: Colors.deepPurple),
-      title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      subtitle: Text(value, style: const TextStyle(fontSize: 16, color: Colors.black87)),
+      title: Text(
+        label,
+        style: const TextStyle(fontSize: 12, color: Colors.grey),
+      ),
+      subtitle: Text(
+        value,
+        style: const TextStyle(fontSize: 16, color: Colors.black87),
+      ),
     );
   }
 
   void _showChangePasswordDialog() {
+    final currentController = TextEditingController();
+    final newController = TextEditingController();
+    final confirmController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool isLoading = false;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cambiar Contraseña'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Contraseña Actual',
-                border: OutlineInputBorder(),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Cambiar Contraseña'),
+            content: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: currentController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Contraseña Actual',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Por favor ingresa tu contraseña actual';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: newController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Nueva Contraseña',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Por favor ingresa una nueva contraseña';
+                      }
+                      if (value.length < 6) {
+                        return 'La contraseña debe tener al menos 6 caracteres';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: confirmController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirmar Nueva Contraseña',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value != newController.text) {
+                        return 'Las contraseñas no coinciden';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 16),
-            TextField(
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: 'Nueva Contraseña',
-                border: OutlineInputBorder(),
+            actions: [
+              TextButton(
+                onPressed: isLoading
+                    ? null
+                    : () => Navigator.pop(dialogContext),
+                child: const Text('Cancelar'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Funcionalidad en desarrollo')),
-              );
-            },
-            child: const Text('Actualizar'),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) return;
+
+                        setDialogState(() => isLoading = true);
+
+                        final authProvider = context.read<AuthProvider>();
+                        final (success, error) = await authProvider
+                            .changePassword(
+                              currentPassword: currentController.text,
+                              newPassword: newController.text,
+                            );
+
+                        if (!dialogContext.mounted) return;
+
+                        setDialogState(() => isLoading = false);
+
+                        if (success) {
+                          Navigator.pop(dialogContext);
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Contraseña actualizada exitosamente',
+                              ),
+                              backgroundColor: Colors.green,
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                error ?? 'Error al cambiar contraseña',
+                              ),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      },
+                child: isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Actualizar'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
