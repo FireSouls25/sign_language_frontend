@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
@@ -16,6 +17,8 @@ class ApiException implements Exception {
 }
 
 class ApiService {
+  static const _timeout = Duration(seconds: 30);
+
   String? _accessToken;
 
   void setToken(String token) {
@@ -40,16 +43,18 @@ class ApiService {
     required String password,
     required String fullName,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/api/auth/register'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'email': email,
-        'username': username,
-        'password': password,
-        'full_name': fullName,
-      }),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConfig.baseUrl}/api/auth/register'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email': email,
+            'username': username,
+            'password': password,
+            'full_name': fullName,
+          }),
+        )
+        .timeout(_timeout);
 
     if (response.statusCode == 201) {
       return User.fromJson(jsonDecode(response.body));
@@ -66,11 +71,13 @@ class ApiService {
     required String username,
     required String password,
   }) async {
-    final response = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/api/auth/login'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'username': username, 'password': password}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConfig.baseUrl}/api/auth/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'username': username, 'password': password}),
+        )
+        .timeout(_timeout);
 
     if (response.statusCode == 200) {
       return AuthTokens.fromJson(jsonDecode(response.body));
@@ -84,10 +91,9 @@ class ApiService {
   }
 
   Future<User> getCurrentUser() async {
-    final response = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/api/auth/me'),
-      headers: _headers,
-    );
+    final response = await http
+        .get(Uri.parse('${ApiConfig.baseUrl}/api/auth/me'), headers: _headers)
+        .timeout(_timeout);
 
     if (response.statusCode == 200) {
       return User.fromJson(jsonDecode(response.body));
@@ -97,11 +103,13 @@ class ApiService {
   }
 
   Future<AuthTokens> refreshTokens(String refreshToken) async {
-    final response = await http.post(
-      Uri.parse('${ApiConfig.baseUrl}/api/auth/refresh'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refresh_token': refreshToken}),
-    );
+    final response = await http
+        .post(
+          Uri.parse('${ApiConfig.baseUrl}/api/auth/refresh'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'refresh_token': refreshToken}),
+        )
+        .timeout(_timeout);
 
     if (response.statusCode == 200) {
       return AuthTokens.fromJson(jsonDecode(response.body));
@@ -115,10 +123,12 @@ class ApiService {
 
   Future<void> logout() async {
     try {
-      await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/api/auth/logout'),
-        headers: _headers,
-      );
+      await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/api/auth/logout'),
+            headers: _headers,
+          )
+          .timeout(const Duration(seconds: 5));
     } catch (_) {}
   }
 
@@ -126,12 +136,14 @@ class ApiService {
     int limit = 20,
     int offset = 0,
   }) async {
-    final response = await http.get(
-      Uri.parse(
-        '${ApiConfig.baseUrl}/api/translation?limit=$limit&offset=$offset',
-      ),
-      headers: _headers,
-    );
+    final response = await http
+        .get(
+          Uri.parse(
+            '${ApiConfig.baseUrl}/api/translation?limit=$limit&offset=$offset',
+          ),
+          headers: _headers,
+        )
+        .timeout(_timeout);
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -145,7 +157,9 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> healthCheck() async {
-    final response = await http.get(Uri.parse('${ApiConfig.baseUrl}/health'));
+    final response = await http
+        .get(Uri.parse('${ApiConfig.baseUrl}/health'))
+        .timeout(const Duration(seconds: 10));
 
     if (response.statusCode == 200) {
       return jsonDecode(response.body);

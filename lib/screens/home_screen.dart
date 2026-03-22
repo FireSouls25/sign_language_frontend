@@ -32,20 +32,26 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription? _translationSubscription;
   StreamSubscription? _errorSubscription;
   StreamSubscription? _connectionSubscription;
+  bool _isVoiceEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    _isVoiceEnabled = context.read<AuthProvider>().isVoiceEnabled;
     _initializeCamera();
     _initializeWebSocket();
     _initializeTts();
   }
 
   Future<void> _initializeTts() async {
-    await _flutterTts.setLanguage("es-CO");
-    await _flutterTts.setSpeechRate(0.5);
-    await _flutterTts.setVolume(1.0);
-    await _flutterTts.setPitch(1.0);
+    try {
+      await _flutterTts.setLanguage('es-CO');
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+    } catch (e) {
+      debugPrint('Error initializing TTS: $e');
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -59,9 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         await _cameraController!.initialize();
         if (mounted) {
-          setState(() {
-            _isCameraInitialized = true;
-          });
+          setState(() => _isCameraInitialized = true);
         }
       }
     } catch (e) {
@@ -76,39 +80,36 @@ class _HomeScreenState extends State<HomeScreen> {
       await _wsService.connect(token: authProvider.accessToken);
 
       _translationSubscription = _wsService.translationStream.listen((result) {
-        if (mounted) {
-          setState(() {
-            _currentTranslation = result.text;
-            _confidence = result.confidence;
-          });
-
-          // Reproducción automática si está habilitada en los ajustes
-          if (context.read<AuthProvider>().isVoiceEnabled && result.text.isNotEmpty) {
-            _speak(result.text);
-          }
+        if (!mounted) return;
+        final text = result.text;
+        setState(() {
+          _currentTranslation = text;
+          _confidence = result.confidence;
+        });
+        if (_isVoiceEnabled && text.isNotEmpty) {
+          _speak(text);
         }
       });
 
       _errorSubscription = _wsService.errorStream.listen((error) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error['message'])));
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error['message'])));
       });
 
       _connectionSubscription = _wsService.connectionStream.listen((connected) {
-        if (mounted) {
-          setState(() {
-            _isTranslating = connected;
-          });
+        if (!mounted) return;
+        if (!connected && _isTranslating) {
+          _frameTimer?.cancel();
+          setState(() => _isTranslating = false);
         }
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to connect: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error de conexión: $e')));
       }
     }
   }
@@ -135,16 +136,13 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final image = await _cameraController!.takePicture();
         final bytes = await image.readAsBytes();
-        
-        // Optimización: Eliminar el archivo temporal inmediatamente después de leerlo
+
         try {
           final file = File(image.path);
           if (await file.exists()) {
             await file.delete();
           }
-        } catch (e) {
-          debugPrint('Error eliminando archivo temporal: $e');
-        }
+        } catch (_) {}
 
         final base64Image = base64Encode(bytes);
         _wsService.sendFrame(base64Image);
@@ -162,9 +160,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _wsService.sendReset();
     }
 
-    setState(() {
-      _isTranslating = false;
-    });
+    setState(() => _isTranslating = false);
   }
 
   Future<void> _speak(String text) async {
@@ -178,6 +174,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _logout() async {
     _stopTranslation();
+    _translationSubscription?.cancel();
+    _errorSubscription?.cancel();
+    _connectionSubscription?.cancel();
     await _wsService.disconnect();
     await _flutterTts.stop();
 
