@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:provider/provider.dart';
@@ -52,7 +53,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_cameras != null && _cameras!.isNotEmpty) {
         _cameraController = CameraController(
           _cameras![0],
-          ResolutionPreset.medium,
+          ResolutionPreset.low,
+          imageFormatGroup: ImageFormatGroup.jpeg,
         );
         await _cameraController!.initialize();
         if (mounted) {
@@ -127,8 +129,18 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final image = await _cameraController!.takePicture();
         final bytes = await image.readAsBytes();
-        final base64Image = base64Encode(bytes);
+        
+        // Optimización: Eliminar el archivo temporal inmediatamente después de leerlo
+        try {
+          final file = File(image.path);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (e) {
+          debugPrint('Error eliminando archivo temporal: $e');
+        }
 
+        final base64Image = base64Encode(bytes);
         _wsService.sendFrame(base64Image);
       } catch (e) {
         debugPrint('Error sending frame: $e');
