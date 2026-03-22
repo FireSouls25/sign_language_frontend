@@ -13,14 +13,14 @@ class ApiConfig {
       case Environment.development:
         return 'http://10.0.2.2:8000';
       case Environment.production:
-        return 'https://sign-language-api.onrender.com';
+        return 'https://sign-language-backend-vqq1.onrender.com';
     }
   }
 
   static String get wsUrl {
     final base = _environment == Environment.development
         ? 'ws://10.0.2.2:8000'
-        : 'wss://sign-language-api.onrender.com';
+        : 'wss://sign-language-backend-vqq1.onrender.com';
     return '$base/ws/translate';
   }
 
