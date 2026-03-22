@@ -156,6 +156,26 @@ class ApiService {
     }
   }
 
+  Future<AuthTokens> exchangeGoogleToken(String idToken) async {
+    final response = await http
+        .post(
+          Uri.parse('${ApiConfig.baseUrl}/api/auth/google-token'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'id_token': idToken}),
+        )
+        .timeout(_timeout);
+
+    if (response.statusCode == 200) {
+      return AuthTokens.fromJson(jsonDecode(response.body));
+    } else {
+      final error = jsonDecode(response.body);
+      throw ApiException(
+        error['detail'] ?? 'Google authentication failed',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
   Future<List<Translation>> getTranslationHistory({
     int limit = 20,
     int offset = 0,

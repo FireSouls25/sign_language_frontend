@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
-import '../services/oauth_service.dart';
+import '../services/google_auth_service.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
 
@@ -14,60 +12,18 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _oauthInProgress = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
+  final _googleAuthService = GoogleAuthService();
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _checkForOAuthCallback();
-    }
-  }
-
-  Future<void> _checkForOAuthCallback() async {
-    if (!_oauthInProgress) return;
-
-    try {
-      final channel = const MethodChannel('com.example.sign_frontend/oauth');
-      final callbackData = await channel.invokeMethod('getOAuthCallback');
-
-      if (callbackData != null && mounted) {
-        final tokens = OAuthTokens(
-          accessToken: callbackData['access_token'],
-          refreshToken: callbackData['refresh_token'],
-          tokenType: callbackData['token_type'] ?? 'bearer',
-        );
-
-        final authProvider = context.read<AuthProvider>();
-        final success = await authProvider.loginWithOAuth(tokens);
-
-        if (success && mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const HomeScreen()),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('OAuth callback error: $e');
-    }
   }
 
   @override
@@ -202,18 +158,9 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
                   ),
                   const SizedBox(height: 24),
                   OutlinedButton.icon(
-                    onPressed: () => _loginWithOAuth(OAuthProvider.google),
+                    onPressed: _loginWithGoogle,
                     icon: const Icon(Icons.g_mobiledata, size: 24),
                     label: const Text('Continuar con Google'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () => _loginWithOAuth(OAuthProvider.apple),
-                    icon: const Icon(Icons.apple, size: 24),
-                    label: const Text('Continuar con Apple'),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -254,43 +201,37 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _loginWithOAuth(OAuthProvider provider) async {
-    setState(() => _oauthInProgress = true);
-
+  Future<void> _loginWithGoogle() async {
     final authProvider = context.read<AuthProvider>();
 
-    try {
-      final loginUrl = OAuthConfig.getLoginUrl(provider);
-      final uri = Uri.parse(loginUrl);
+    final result = await _googleAuthService.signIn();
 
-      if (!await canLaunchUrl(uri)) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No se puede abrir el navegador')),
-          );
-        }
-        return;
+    if (!result.success) {
+      if (result.error != 'sign_in_cancelled' && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${result.error}')));
       }
+      return;
+    }
 
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-
+    if (result.idToken == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Inicia sesión en Google y vuelve a la app'),
-            action: SnackBarAction(label: 'OK', onPressed: () {}),
-            duration: const Duration(seconds: 5),
+          const SnackBar(
+            content: Text('No se pudo obtener el token de Google'),
           ),
         );
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('OAuth Error: $e')));
-      }
-    } finally {
-      setState(() => _oauthInProgress = false);
+      return;
+    }
+
+    final success = await authProvider.loginWithGoogleToken(result.idToken!);
+
+    if (success && mounted) {
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
     }
   }
 }

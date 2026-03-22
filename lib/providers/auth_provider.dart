@@ -39,6 +39,37 @@ class AuthProvider extends ChangeNotifier {
     return _user != null;
   }
 
+  Future<bool> loginWithGoogleToken(String googleIdToken) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final tokens = await _apiService.exchangeGoogleToken(googleIdToken);
+
+      _accessToken = tokens.accessToken;
+      _refreshToken = tokens.refreshToken;
+      _apiService.setToken(_accessToken!);
+
+      await _saveTokens();
+      await fetchCurrentUser();
+
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } catch (e) {
+      _error = 'Error de conexión con Google.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   AuthProvider() {
     _loadTokens();
   }
