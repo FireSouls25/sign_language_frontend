@@ -38,7 +38,11 @@ class OAuthConfig {
   }
 
   static String getRedirectUri() {
-    return '${ApiConfig.baseUrl}/api/auth/callback/google';
+    return '${ApiConfig.baseUrl}/api/auth/callback-deep-link/google';
+  }
+
+  static String getDeepLinkCallbackUrl() {
+    return 'lsc://oauth/callback';
   }
 }
 
