@@ -3,14 +3,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/oauth_service.dart';
+import '../services/secure_storage_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final SecureStorageService _secureStorage = SecureStorageService();
 
   User? _user;
   String? _accessToken;
   String? _refreshToken;
   bool _isLoading = false;
+  bool _isRefreshing = false;
   String? _error;
   bool _isVoiceEnabled = true;
 
@@ -26,9 +29,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _loadTokens() async {
+    _accessToken = await _secureStorage.getAccessToken();
+    _refreshToken = await _secureStorage.getRefreshToken();
+
     final prefs = await SharedPreferences.getInstance();
-    _accessToken = prefs.getString('access_token');
-    _refreshToken = prefs.getString('refresh_token');
     _isVoiceEnabled = prefs.getBool('is_voice_enabled') ?? true;
 
     if (_accessToken != null) {
@@ -39,19 +43,59 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _saveTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (_accessToken != null) {
-      await prefs.setString('access_token', _accessToken!);
-    }
-    if (_refreshToken != null) {
-      await prefs.setString('refresh_token', _refreshToken!);
+    if (_accessToken != null && _refreshToken != null) {
+      await _secureStorage.saveTokens(
+        accessToken: _accessToken!,
+        refreshToken: _refreshToken!,
+      );
     }
   }
 
+  Future<void> _updateAccessToken(String token) async {
+    _accessToken = token;
+    _apiService.setToken(token);
+    await _secureStorage.saveAccessToken(token);
+  }
+
   Future<void> _clearTokens() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('access_token');
-    await prefs.remove('refresh_token');
+    await _secureStorage.clearTokens();
+  }
+
+  Future<bool> _tryRefreshToken() async {
+    if (_refreshToken == null || _isRefreshing) return false;
+
+    _isRefreshing = true;
+    try {
+      final tokens = await _apiService.refreshTokens(_refreshToken!);
+      await _updateAccessToken(tokens.accessToken);
+      _refreshToken = tokens.refreshToken;
+      await _saveTokens();
+      _isRefreshing = false;
+      return true;
+    } catch (e) {
+      _isRefreshing = false;
+      return false;
+    }
+  }
+
+  Future<dynamic> authenticatedRequest(
+    Future<dynamic> Function(String token) request,
+  ) async {
+    if (_accessToken == null) {
+      throw ApiException('Not authenticated');
+    }
+
+    try {
+      return await request(_accessToken!);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401 && _refreshToken != null) {
+        final refreshed = await _tryRefreshToken();
+        if (refreshed) {
+          return await request(_accessToken!);
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<bool> register({
@@ -144,11 +188,20 @@ class AuthProvider extends ChangeNotifier {
       _user = await _apiService.getCurrentUser();
       notifyListeners();
     } catch (e) {
+      if (e is ApiException && e.statusCode == 401) {
+        final refreshed = await _tryRefreshToken();
+        if (refreshed) {
+          await fetchCurrentUser();
+          return;
+        }
+      }
       await logout();
     }
   }
 
   Future<void> logout() async {
+    await _apiService.logout();
+
     _user = null;
     _accessToken = null;
     _refreshToken = null;

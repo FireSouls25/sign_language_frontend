@@ -96,6 +96,32 @@ class ApiService {
     }
   }
 
+  Future<AuthTokens> refreshTokens(String refreshToken) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/auth/refresh'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'refresh_token': refreshToken}),
+    );
+
+    if (response.statusCode == 200) {
+      return AuthTokens.fromJson(jsonDecode(response.body));
+    } else {
+      throw ApiException(
+        'Failed to refresh tokens',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
+  Future<void> logout() async {
+    try {
+      await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/auth/logout'),
+        headers: _headers,
+      );
+    } catch (_) {}
+  }
+
   Future<List<Translation>> getTranslationHistory({
     int limit = 20,
     int offset = 0,
