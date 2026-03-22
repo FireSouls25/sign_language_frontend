@@ -9,6 +9,7 @@ import '../providers/auth_provider.dart';
 import '../services/translation_websocket_service.dart';
 import 'login_screen.dart';
 import 'history_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -80,6 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _currentTranslation = result.text;
             _confidence = result.confidence;
           });
+
+          // Reproducción automática si está habilitada en los ajustes
+          if (context.read<AuthProvider>().isVoiceEnabled && result.text.isNotEmpty) {
+            _speak(result.text);
+          }
         }
       });
 
@@ -230,6 +236,14 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
             },
           ),
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),

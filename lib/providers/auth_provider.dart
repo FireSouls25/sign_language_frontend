@@ -12,12 +12,14 @@ class AuthProvider extends ChangeNotifier {
   String? _refreshToken;
   bool _isLoading = false;
   String? _error;
+  bool _isVoiceEnabled = true;
 
   User? get user => _user;
   bool get isAuthenticated => _accessToken != null;
   bool get isLoading => _isLoading;
   String? get error => _error;
   String? get accessToken => _accessToken;
+  bool get isVoiceEnabled => _isVoiceEnabled;
 
   AuthProvider() {
     _loadTokens();
@@ -27,6 +29,7 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _accessToken = prefs.getString('access_token');
     _refreshToken = prefs.getString('refresh_token');
+    _isVoiceEnabled = prefs.getBool('is_voice_enabled') ?? true;
 
     if (_accessToken != null) {
       _apiService.setToken(_accessToken!);
@@ -156,6 +159,13 @@ class AuthProvider extends ChangeNotifier {
 
   void clearError() {
     _error = null;
+    notifyListeners();
+  }
+
+  Future<void> toggleVoice(bool enabled) async {
+    _isVoiceEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_voice_enabled', enabled);
     notifyListeners();
   }
 }
