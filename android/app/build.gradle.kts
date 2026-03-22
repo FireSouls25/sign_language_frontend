@@ -29,10 +29,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("app/upload-keystore.jks")
-            storePassword = "sign123456"
-            keyAlias = "upload"
-            keyPassword = "sign123456"
+            storeFile = file("upload-keystore.jks")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "sign123456"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "sign123456"
         }
     }
 

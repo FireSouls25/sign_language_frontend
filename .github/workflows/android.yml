@@ -59,14 +59,15 @@ jobs:
           mkdir -p android/app
           echo "$KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
       
-      - name: Create keystore properties
+      - name: Set environment variables for signing
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
-          cat > android/key.properties << 'EOF'
-          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=app/upload-keystore.jks
-          EOF
+          echo "KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> $GITHUB_ENV
+          echo "KEY_PASSWORD=$KEY_PASSWORD" >> $GITHUB_ENV
+          echo "KEY_ALIAS=$KEY_ALIAS" >> $GITHUB_ENV
       
       - name: Build release APK
         run: flutter build apk --release
