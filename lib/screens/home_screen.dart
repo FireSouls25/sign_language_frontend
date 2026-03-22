@@ -203,9 +203,26 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Traductor LSC'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
+        centerTitle: true,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Traductor LSC'),
+            const SizedBox(width: 8),
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _wsService.isConnected
+                    ? Colors.greenAccent
+                    : (_wsService.isConnecting ? Colors.orange : Colors.red),
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -280,6 +297,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          if (!_wsService.isConnected && !_wsService.isConnecting) ...[
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: _initializeWebSocket,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reconectar Servidor'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
           if (_currentTranslation.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
