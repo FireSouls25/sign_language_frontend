@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
 import '../services/translation_websocket_service.dart';
 import 'login_screen.dart';
@@ -20,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final FlutterTts _flutterTts = FlutterTts();
 
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
@@ -36,6 +36,14 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _initializeCamera();
     _initializeWebSocket();
+    _initializeTts();
+  }
+
+  Future<void> _initializeTts() async {
+    await _flutterTts.setLanguage("es-CO");
+    await _flutterTts.setSpeechRate(0.5);
+    await _flutterTts.setVolume(1.0);
+    await _flutterTts.setPitch(1.0);
   }
 
   Future<void> _initializeCamera() async {
@@ -141,20 +149,19 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _playAudio(String? audioUrl) async {
-    if (audioUrl == null || audioUrl.isEmpty) return;
-
+  Future<void> _speak(String text) async {
+    if (text.isEmpty) return;
     try {
-      await _audioPlayer.play(UrlSource(audioUrl));
+      await _flutterTts.speak(text);
     } catch (e) {
-      debugPrint('Error playing audio: $e');
+      debugPrint('Error speaking text: $e');
     }
   }
 
   Future<void> _logout() async {
     _stopTranslation();
     await _wsService.disconnect();
-    await _audioPlayer.dispose();
+    await _flutterTts.stop();
 
     if (mounted) {
       final authProvider = context.read<AuthProvider>();
@@ -175,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _errorSubscription?.cancel();
     _connectionSubscription?.cancel();
     _wsService.dispose();
-    _audioPlayer.dispose();
+    _flutterTts.stop();
     _cameraController?.dispose();
     super.dispose();
   }
@@ -273,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.volume_up),
-                  onPressed: () {},
+                  onPressed: () => _speak(_currentTranslation),
                   color: Colors.deepPurple,
                 ),
               ],
