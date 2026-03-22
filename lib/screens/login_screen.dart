@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/auth_provider.dart';
 import '../services/oauth_service.dart';
-import 'oauth_webview_screen.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
 
@@ -15,156 +14,60 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _oauthInProgress = false;
 
-  bool get _isDesktop {
-    return kIsWeb ||
-        defaultTargetPlatform == TargetPlatform.linux ||
-        defaultTargetPlatform == TargetPlatform.macOS ||
-        defaultTargetPlatform == TargetPlatform.windows;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.login(
-      username: _usernameController.text.trim(),
-      password: _passwordController.text,
-    );
-
-    if (success && mounted) {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkForOAuthCallback();
     }
   }
 
-  Future<void> _loginWithOAuth(OAuthProvider provider) async {
-    final authProvider = context.read<AuthProvider>();
-    final oauthService = OAuthService();
+  Future<void> _checkForOAuthCallback() async {
+    if (!_oauthInProgress) return;
 
-    if (!_isDesktop) {
-      try {
-        final tokens = await startOAuthWebView(context, provider);
+    try {
+      final channel = const MethodChannel('com.example.sign_frontend/oauth');
+      final callbackData = await channel.invokeMethod('getOAuthCallback');
 
-        if (tokens != null) {
-          final success = await authProvider.loginWithOAuth(tokens);
-          if (success && mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const HomeScreen()),
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('OAuth Error: $e')));
-        }
-      }
-    } else {
-      final loginUrl = OAuthConfig.getLoginUrl(provider);
-      final uri = Uri.parse(loginUrl);
+      if (callbackData != null && mounted) {
+        final tokens = OAuthTokens(
+          accessToken: callbackData['access_token'],
+          refreshToken: callbackData['refresh_token'],
+          tokenType: callbackData['token_type'] ?? 'bearer',
+        );
 
-      if (!await canLaunchUrl(uri)) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('No se puede abrir el navegador')));
-        }
-        return;
-      }
-
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-
-      if (!mounted) return;
-
-      final tokens = await _showTokenInputDialog();
-
-      if (tokens != null) {
+        final authProvider = context.read<AuthProvider>();
         final success = await authProvider.loginWithOAuth(tokens);
+
         if (success && mounted) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         }
       }
+    } catch (e) {
+      debugPrint('OAuth callback error: $e');
     }
-  }
-
-  Future<OAuthTokens?> _showTokenInputDialog() async {
-    final accessController = TextEditingController();
-    final refreshController = TextEditingController();
-
-    return showDialog<OAuthTokens>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Completar Inicio de Sesión OAuth'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Después de iniciar sesión con Google en el navegador:\n\n'
-                '1. Copia el access_token de la página\n'
-                '2. Pégalo abajo\n\n'
-                'Haz clic en "Iniciar Sesión" si el navegador no se abrió.',
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: accessController,
-                decoration: const InputDecoration(
-                  labelText: 'access_token',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: refreshController,
-                decoration: const InputDecoration(
-                  labelText: 'refresh_token',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (accessController.text.isNotEmpty) {
-                final tokens = OAuthTokens(
-                  accessToken: accessController.text.trim(),
-                  refreshToken: refreshController.text.trim(),
-                );
-                Navigator.of(context).pop(tokens);
-              }
-            },
-            child: const Text('Iniciar Sesión'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -298,34 +201,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  Consumer<AuthProvider>(
-                    builder: (context, auth, _) {
-                      return OutlinedButton.icon(
-                        onPressed: auth.isLoading
-                            ? null
-                            : () => _loginWithOAuth(OAuthProvider.google),
-                        icon: const Icon(Icons.g_mobiledata, size: 24),
-                        label: const Text('Continuar con Google'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      );
-                    },
+                  OutlinedButton.icon(
+                    onPressed: () => _loginWithOAuth(OAuthProvider.google),
+                    icon: const Icon(Icons.g_mobiledata, size: 24),
+                    label: const Text('Continuar con Google'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                   const SizedBox(height: 12),
-                  Consumer<AuthProvider>(
-                    builder: (context, auth, _) {
-                      return OutlinedButton.icon(
-                        onPressed: auth.isLoading
-                            ? null
-                            : () => _loginWithOAuth(OAuthProvider.apple),
-                        icon: const Icon(Icons.apple, size: 24),
-                        label: const Text('Continuar con Apple'),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      );
-                    },
+                  OutlinedButton.icon(
+                    onPressed: () => _loginWithOAuth(OAuthProvider.apple),
+                    icon: const Icon(Icons.apple, size: 24),
+                    label: const Text('Continuar con Apple'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextButton(
@@ -345,5 +236,61 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.login(
+      username: _usernameController.text.trim(),
+      password: _passwordController.text,
+    );
+
+    if (success && mounted) {
+      Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+    }
+  }
+
+  Future<void> _loginWithOAuth(OAuthProvider provider) async {
+    setState(() => _oauthInProgress = true);
+
+    final authProvider = context.read<AuthProvider>();
+
+    try {
+      final loginUrl = OAuthConfig.getLoginUrl(provider);
+      final uri = Uri.parse(loginUrl);
+
+      if (!await canLaunchUrl(uri)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se puede abrir el navegador')),
+          );
+        }
+        return;
+      }
+
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Inicia sesión en Google y vuelve a la app'),
+            action: SnackBarAction(label: 'OK', onPressed: () {}),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('OAuth Error: $e')));
+      }
+    } finally {
+      setState(() => _oauthInProgress = false);
+    }
   }
 }

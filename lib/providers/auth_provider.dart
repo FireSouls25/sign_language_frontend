@@ -28,6 +28,17 @@ class AuthProvider extends ChangeNotifier {
   String? get accessToken => _accessToken;
   bool get isVoiceEnabled => _isVoiceEnabled;
 
+  Future<bool> handleOAuthCallback(OAuthTokens tokens) async {
+    _accessToken = tokens.accessToken;
+    _refreshToken = tokens.refreshToken;
+    _apiService.setToken(_accessToken!);
+
+    await _saveTokens();
+    await fetchCurrentUser();
+
+    return _user != null;
+  }
+
   AuthProvider() {
     _loadTokens();
   }
