@@ -82,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Cannot open browser')));
+          ).showSnackBar(const SnackBar(content: Text('No se puede abrir el navegador')));
         }
         return;
       }
@@ -112,17 +112,17 @@ class _LoginScreenState extends State<LoginScreen> {
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Text('Complete OAuth Login'),
+        title: const Text('Completar Inicio de Sesión OAuth'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'After logging in with Google in the browser:\n\n'
-                '1. Copy the access_token from the page\n'
-                '2. Paste it below\n\n'
-                'Click "Open Browser" if the browser didn\'t open.',
+                'Después de iniciar sesión con Google en el navegador:\n\n'
+                '1. Copia el access_token de la página\n'
+                '2. Pégalo abajo\n\n'
+                'Haz clic en "Iniciar Sesión" si el navegador no se abrió.',
               ),
               const SizedBox(height: 16),
               TextField(
@@ -148,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () {
@@ -160,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Navigator.of(context).pop(tokens);
               }
             },
-            child: const Text('Login'),
+            child: const Text('Iniciar Sesión'),
           ),
         ],
       ),
@@ -187,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'LSC Translator',
+                    'Traductor LSC',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Colors.deepPurple,
@@ -196,7 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Colombian Sign Language Translation',
+                    'Traductor de Lengua de Señas Colombiana',
                     style: Theme.of(
                       context,
                     ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
@@ -206,13 +206,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   TextFormField(
                     controller: _usernameController,
                     decoration: const InputDecoration(
-                      labelText: 'Username',
+                      labelText: 'Usuario',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your username';
+                        return 'Por favor ingresa tu usuario';
                       }
                       return null;
                     },
@@ -222,7 +222,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                      labelText: 'Contraseña',
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
@@ -240,7 +240,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
+                        return 'Por favor ingresa tu contraseña';
                       }
                       return null;
                     },
@@ -280,7 +280,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               )
                             : const Text(
-                                'Login',
+                                'Iniciar Sesión',
                                 style: TextStyle(fontSize: 16),
                               ),
                       );
@@ -292,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Expanded(child: Divider()),
                       Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('OR'),
+                        child: Text('O'),
                       ),
                       Expanded(child: Divider()),
                     ],
@@ -305,7 +305,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? null
                             : () => _loginWithOAuth(OAuthProvider.google),
                         icon: const Icon(Icons.g_mobiledata, size: 24),
-                        label: const Text('Continue with Google'),
+                        label: const Text('Continuar con Google'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -320,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? null
                             : () => _loginWithOAuth(OAuthProvider.apple),
                         icon: const Icon(Icons.apple, size: 24),
-                        label: const Text('Continue with Apple'),
+                        label: const Text('Continuar con Apple'),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
@@ -336,7 +336,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       );
                     },
-                    child: const Text("Don't have an account? Register"),
+                    child: const Text("¿No tienes cuenta? Regístrate"),
                   ),
                 ],
               ),

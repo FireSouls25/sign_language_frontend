@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
 import '../services/translation_websocket_service.dart';
+import '../widgets/ls_app_bar.dart';
 import 'login_screen.dart';
 import 'history_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final FlutterTts _flutterTts = FlutterTts();
 
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
@@ -30,12 +33,26 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription? _translationSubscription;
   StreamSubscription? _errorSubscription;
   StreamSubscription? _connectionSubscription;
+  bool _isVoiceEnabled = true;
 
   @override
   void initState() {
     super.initState();
+    _isVoiceEnabled = context.read<AuthProvider>().isVoiceEnabled;
     _initializeCamera();
     _initializeWebSocket();
+    _initializeTts();
+  }
+
+  Future<void> _initializeTts() async {
+    try {
+      await _flutterTts.setLanguage('es-CO');
+      await _flutterTts.setSpeechRate(0.5);
+      await _flutterTts.setVolume(1.0);
+      await _flutterTts.setPitch(1.0);
+    } catch (e) {
+      debugPrint('Error initializing TTS: $e');
+    }
   }
 
   Future<void> _initializeCamera() async {
@@ -44,13 +61,12 @@ class _HomeScreenState extends State<HomeScreen> {
       if (_cameras != null && _cameras!.isNotEmpty) {
         _cameraController = CameraController(
           _cameras![0],
-          ResolutionPreset.medium,
+          ResolutionPreset.low,
+          imageFormatGroup: ImageFormatGroup.jpeg,
         );
         await _cameraController!.initialize();
         if (mounted) {
-          setState(() {
-            _isCameraInitialized = true;
-          });
+          setState(() => _isCameraInitialized = true);
         }
       }
     } catch (e) {
@@ -65,34 +81,36 @@ class _HomeScreenState extends State<HomeScreen> {
       await _wsService.connect(token: authProvider.accessToken);
 
       _translationSubscription = _wsService.translationStream.listen((result) {
-        if (mounted) {
-          setState(() {
-            _currentTranslation = result.text;
-            _confidence = result.confidence;
-          });
+        if (!mounted) return;
+        final text = result.text;
+        setState(() {
+          _currentTranslation = text;
+          _confidence = result.confidence;
+        });
+        if (_isVoiceEnabled && text.isNotEmpty) {
+          _speak(text);
         }
       });
 
       _errorSubscription = _wsService.errorStream.listen((error) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error['message'])));
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error['message'])));
       });
 
       _connectionSubscription = _wsService.connectionStream.listen((connected) {
-        if (mounted) {
-          setState(() {
-            _isTranslating = connected;
-          });
+        if (!mounted) return;
+        if (!connected && _isTranslating) {
+          _frameTimer?.cancel();
+          setState(() => _isTranslating = false);
         }
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Failed to connect: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error de conexión: $e')));
       }
     }
   }
@@ -119,8 +137,15 @@ class _HomeScreenState extends State<HomeScreen> {
       try {
         final image = await _cameraController!.takePicture();
         final bytes = await image.readAsBytes();
-        final base64Image = base64Encode(bytes);
 
+        try {
+          final file = File(image.path);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (_) {}
+
+        final base64Image = base64Encode(bytes);
         _wsService.sendFrame(base64Image);
       } catch (e) {
         debugPrint('Error sending frame: $e');
@@ -136,25 +161,25 @@ class _HomeScreenState extends State<HomeScreen> {
       _wsService.sendReset();
     }
 
-    setState(() {
-      _isTranslating = false;
-    });
+    setState(() => _isTranslating = false);
   }
 
-  Future<void> _playAudio(String? audioUrl) async {
-    if (audioUrl == null || audioUrl.isEmpty) return;
-
+  Future<void> _speak(String text) async {
+    if (text.isEmpty) return;
     try {
-      await _audioPlayer.play(UrlSource(audioUrl));
+      await _flutterTts.speak(text);
     } catch (e) {
-      debugPrint('Error playing audio: $e');
+      debugPrint('Error speaking text: $e');
     }
   }
 
   Future<void> _logout() async {
     _stopTranslation();
+    _translationSubscription?.cancel();
+    _errorSubscription?.cancel();
+    _connectionSubscription?.cancel();
     await _wsService.disconnect();
-    await _audioPlayer.dispose();
+    await _flutterTts.stop();
 
     if (mounted) {
       final authProvider = context.read<AuthProvider>();
@@ -175,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _errorSubscription?.cancel();
     _connectionSubscription?.cancel();
     _wsService.dispose();
-    _audioPlayer.dispose();
+    _flutterTts.stop();
     _cameraController?.dispose();
     super.dispose();
   }
@@ -183,10 +208,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('LSC Translator'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
+      appBar: LSAppBar(
+        title: 'Traductor LSC',
+        showConnectionIndicator: true,
+        isConnected: _wsService.isConnected,
+        isConnecting: _wsService.isConnecting,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -194,6 +220,14 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
             },
           ),
           IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
@@ -240,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Translation',
+            'Traducción',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -250,7 +284,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Center(
               child: Text(
                 _currentTranslation.isEmpty
-                    ? 'Press the button to start translating'
+                    ? 'Presiona el botón para empezar a traducir'
                     : _currentTranslation,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: _currentTranslation.isEmpty
@@ -261,19 +295,32 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
+          if (!_wsService.isConnected && !_wsService.isConnecting) ...[
+            Center(
+              child: ElevatedButton.icon(
+                onPressed: _initializeWebSocket,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reconectar Servidor'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
           if (_currentTranslation.isNotEmpty) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Confidence: ${(_confidence * 100).toStringAsFixed(1)}%',
+                  'Precisión: ${(_confidence * 100).toStringAsFixed(1)}%',
                   style: TextStyle(
                     color: _confidence >= 0.7 ? Colors.green : Colors.orange,
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.volume_up),
-                  onPressed: () {},
+                  onPressed: () => _speak(_currentTranslation),
                   color: Colors.deepPurple,
                 ),
               ],
@@ -289,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onPressed: _isTranslating ? _stopTranslation : _startTranslation,
       backgroundColor: _isTranslating ? Colors.red : Colors.deepPurple,
       icon: Icon(_isTranslating ? Icons.stop : Icons.translate),
-      label: Text(_isTranslating ? 'Stop' : 'Translate'),
+      label: Text(_isTranslating ? 'Detener' : 'Traducir'),
     );
   }
 }

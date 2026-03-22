@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/oauth_service.dart';
+import '../widgets/ls_app_bar.dart';
 
 class OAuthScreen extends StatefulWidget {
   final OAuthProvider provider;
@@ -58,16 +59,15 @@ class _OAuthScreenState extends State<OAuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.provider == OAuthProvider.google
-              ? 'Login with Google'
-              : 'Login with Apple',
-        ),
+      appBar: LSAppBar(
+        title: widget.provider == OAuthProvider.google
+            ? 'Login with Google'
+            : 'Login with Apple',
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        automaticallyImplyLeading: false,
       ),
       body: Center(
         child: Padding(

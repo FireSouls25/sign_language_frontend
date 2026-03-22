@@ -42,7 +42,19 @@ class OAuthConfig {
   }
 }
 
+class OAuthException implements Exception {
+  final String message;
+  final int? statusCode;
+
+  OAuthException(this.message, {this.statusCode});
+
+  @override
+  String toString() => message;
+}
+
 class OAuthService {
+  static const _timeout = Duration(seconds: 30);
+
   bool get isDesktop {
     return kIsWeb ||
         defaultTargetPlatform == TargetPlatform.linux ||
@@ -60,7 +72,7 @@ class OAuthService {
 
     final uri = Uri.parse(loginUrl);
     if (!await canLaunchUrl(uri)) {
-      throw Exception('Cannot launch OAuth URL');
+      throw OAuthException('Cannot launch OAuth URL');
     }
 
     await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -77,35 +89,44 @@ class OAuthService {
     String? error = uri.queryParameters['error'];
 
     if (error != null) {
-      throw Exception('OAuth error: $error');
+      throw OAuthException('OAuth error: $error');
     }
 
     if (code == null) {
-      throw Exception('No authorization code received');
+      throw OAuthException('No authorization code received');
     }
 
     final callbackUrl = OAuthConfig.getRedirectUri();
 
     try {
-      final response = await http.get(
-        Uri.parse('$callbackUrl?code=$code'),
-        headers: {'Content-Type': 'application/json'},
-      );
+      final response = await http
+          .get(
+            Uri.parse('$callbackUrl?code=$code'),
+            headers: {'Content-Type': 'application/json'},
+          )
+          .timeout(_timeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return OAuthTokens.fromJson(data);
       } else {
         final errorBody = jsonDecode(response.body);
-        throw Exception(errorBody['detail'] ?? 'OAuth token exchange failed');
-      }
-    } catch (e) {
-      if (e.toString().contains('SocketException')) {
-        throw Exception(
-          'Cannot connect to server. Make sure the backend is running.',
+        throw OAuthException(
+          errorBody['detail'] ?? 'OAuth token exchange failed',
+          statusCode: response.statusCode,
         );
       }
-      rethrow;
+    } on TimeoutException {
+      throw OAuthException('La conexión tardó demasiado. Intenta de nuevo.');
+    } catch (e) {
+      if (e is OAuthException) rethrow;
+      if (e.toString().contains('SocketException') ||
+          e.toString().contains('Connection')) {
+        throw OAuthException(
+          'No se puede conectar al servidor. Verifica tu conexión a internet.',
+        );
+      }
+      throw OAuthException('Error en el flujo OAuth: $e');
     }
   }
 

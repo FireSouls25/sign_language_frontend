@@ -10,7 +10,7 @@ typedef ConnectionCallback = void Function();
 
 class TranslationWebSocketService {
   WebSocketChannel? _channel;
-  StreamSubscription? _subscription;
+  StreamSubscription<dynamic>? _subscription;
 
   final _translationController =
       StreamController<TranslationResult>.broadcast();
@@ -22,16 +22,21 @@ class TranslationWebSocketService {
   Stream<Map<String, dynamic>> get errorStream => _errorController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
 
+  bool _isConnecting = false;
+  bool get isConnecting => _isConnecting;
+
   bool _isConnected = false;
   bool get isConnected => _isConnected;
 
   Future<void> connect({String? token}) async {
     await disconnect();
 
-    String wsUrl = ApiConfig.wsUrl;
-    if (token != null) {
-      wsUrl += '?token=$token';
-    }
+    final wsUrl = token != null
+        ? ApiConfig.buildWsUrlWithToken(token)
+        : ApiConfig.wsUrl;
+
+    _isConnecting = true;
+    _connectionController.add(false);
 
     try {
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -40,12 +45,15 @@ class TranslationWebSocketService {
         _onMessage,
         onError: _onError,
         onDone: _onDone,
+        cancelOnError: false,
       );
 
       _isConnected = true;
+      _isConnecting = false;
       _connectionController.add(true);
     } catch (e) {
       _isConnected = false;
+      _isConnecting = false;
       _connectionController.add(false);
       rethrow;
     }
@@ -78,15 +86,17 @@ class TranslationWebSocketService {
 
   void _onError(dynamic error) {
     _isConnected = false;
+    _isConnecting = false;
     _connectionController.add(false);
     _errorController.add({
-      'message': error.toString(),
+      'message': 'Error de conexión: Verifica tu internet o el servidor',
       'code': 'CONNECTION_ERROR',
     });
   }
 
   void _onDone() {
     _isConnected = false;
+    _isConnecting = false;
     _connectionController.add(false);
   }
 
@@ -108,10 +118,13 @@ class TranslationWebSocketService {
 
   Future<void> disconnect() async {
     await _subscription?.cancel();
+    _subscription = null;
+
     await _channel?.sink.close();
     _channel = null;
-    _subscription = null;
+
     _isConnected = false;
+    _isConnecting = false;
     _connectionController.add(false);
   }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../services/oauth_service.dart';
+import '../widgets/ls_app_bar.dart';
 
 class OAuthWebViewScreen extends StatefulWidget {
   final OAuthProvider provider;
@@ -105,16 +106,15 @@ class _OAuthWebViewScreenState extends State<OAuthWebViewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.provider == OAuthProvider.google
-              ? 'Login with Google'
-              : 'Login with Apple',
-        ),
+      appBar: LSAppBar(
+        title: widget.provider == OAuthProvider.google
+            ? 'Login with Google'
+            : 'Login with Apple',
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
