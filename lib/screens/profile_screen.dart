@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -52,6 +53,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildInfoTile(Icons.email, 'Correo Electrónico', user.email),
                   const SizedBox(height: 24),
                   _buildSectionTitle('Ajustes de la Aplicación'),
+                  SwitchListTile(
+                    title: const Text('Modo Oscuro'),
+                    subtitle: const Text('Cambiar el aspecto de la aplicación'),
+                    value: context.watch<ThemeProvider>().isDarkMode,
+                    activeColor: Colors.deepPurple,
+                    onChanged: (bool value) {
+                      context.read<ThemeProvider>().toggleTheme(value);
+                    },
+                    secondary: const Icon(Icons.dark_mode),
+                  ),
                   SwitchListTile(
                     title: const Text('Reproducción de Voz (TTS)'),
                     subtitle: const Text('Escuchar la traducción automáticamente'),
