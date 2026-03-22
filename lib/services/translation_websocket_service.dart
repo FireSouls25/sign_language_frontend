@@ -31,10 +31,9 @@ class TranslationWebSocketService {
   Future<void> connect({String? token}) async {
     await disconnect();
 
-    String wsUrl = ApiConfig.wsUrl;
-    if (token != null) {
-      wsUrl += '?token=$token';
-    }
+    final wsUrl = token != null
+        ? ApiConfig.buildWsUrlWithToken(token)
+        : ApiConfig.wsUrl;
 
     _isConnecting = true;
     _connectionController.add(false); // Estamos en proceso de conectar
