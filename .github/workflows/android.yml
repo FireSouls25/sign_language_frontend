@@ -1,0 +1,33 @@
+name: Build Android
+
+on:
+  push:
+    branches: [ main, segunda ]
+  pull_request:
+    branches: [ main, segunda ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.4'
+          channel: 'stable'
+      
+      - run: flutter pub get
+      
+      - run: flutter build apk --debug
+      
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-${{ github.sha }}.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
