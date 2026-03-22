@@ -52,7 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Account'),
+        title: const Text('Crear Cuenta'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
@@ -75,16 +75,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                      labelText: 'Email',
+                      labelText: 'Correo',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.email),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your email';
+                        return 'Por favor ingresa tu correo';
                       }
                       if (!value.contains('@')) {
-                        return 'Please enter a valid email';
+                        return 'Por favor ingresa un correo válido';
                       }
                       return null;
                     },
@@ -93,13 +93,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _usernameController,
                     decoration: const InputDecoration(
-                      labelText: 'Username',
+                      labelText: 'Usuario',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a username';
+                        return 'Por favor ingresa un usuario';
                       }
                       return null;
                     },
@@ -108,13 +108,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   TextFormField(
                     controller: _fullNameController,
                     decoration: const InputDecoration(
-                      labelText: 'Full Name',
+                      labelText: 'Nombre Completo',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.badge),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter your full name';
+                        return 'Por favor ingresa tu nombre completo';
                       }
                       return null;
                     },
@@ -124,7 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: 'Password',
+                      labelText: 'Contraseña',
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
@@ -142,10 +142,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a password';
+                        return 'Por favor ingresa una contraseña';
                       }
                       if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                        return 'La contraseña debe tener al menos 6 caracteres';
                       }
                       return null;
                     },
@@ -155,7 +155,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: _confirmPasswordController,
                     obscureText: _obscureConfirmPassword,
                     decoration: InputDecoration(
-                      labelText: 'Confirm Password',
+                      labelText: 'Confirmar Contraseña',
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
@@ -173,10 +173,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please confirm your password';
+                        return 'Por favor confirma tu contraseña';
                       }
                       if (value != _passwordController.text) {
-                        return 'Passwords do not match';
+                        return 'Las contraseñas no coinciden';
                       }
                       return null;
                     },
@@ -216,7 +216,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 ),
                               )
                             : const Text(
-                                'Register',
+                                'Registrarse',
                                 style: TextStyle(fontSize: 16),
                               ),
                       );
@@ -227,7 +227,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     onPressed: () {
                       Navigator.of(context).pop();
                     },
-                    child: const Text('Already have an account? Login'),
+                    child: const Text('¿Ya tienes cuenta? Inicia Sesión'),
                   ),
                 ],
               ),

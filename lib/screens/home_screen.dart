@@ -191,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('LSC Translator'),
+        title: const Text('Traductor LSC'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
         actions: [
@@ -247,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Translation',
+            'Traducción',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -257,7 +257,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Center(
               child: Text(
                 _currentTranslation.isEmpty
-                    ? 'Press the button to start translating'
+                    ? 'Presiona el botón para empezar a traducir'
                     : _currentTranslation,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: _currentTranslation.isEmpty
@@ -273,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Confidence: ${(_confidence * 100).toStringAsFixed(1)}%',
+                  'Precisión: ${(_confidence * 100).toStringAsFixed(1)}%',
                   style: TextStyle(
                     color: _confidence >= 0.7 ? Colors.green : Colors.orange,
                   ),
@@ -296,7 +296,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onPressed: _isTranslating ? _stopTranslation : _startTranslation,
       backgroundColor: _isTranslating ? Colors.red : Colors.deepPurple,
       icon: Icon(_isTranslating ? Icons.stop : Icons.translate),
-      label: Text(_isTranslating ? 'Stop' : 'Translate'),
+      label: Text(_isTranslating ? 'Detener' : 'Traducir'),
     );
   }
 }

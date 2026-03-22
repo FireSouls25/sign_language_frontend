@@ -53,7 +53,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to play audio')));
+        ).showSnackBar(const SnackBar(content: Text('Falló la reproducción del audio')));
       }
     }
   }
@@ -68,7 +68,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Translation History'),
+        title: const Text('Historial de Traducciones'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
@@ -100,7 +100,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 });
                 _loadHistory();
               },
-              child: const Text('Retry'),
+              child: const Text('Reintentar'),
             ),
           ],
         ),
@@ -115,7 +115,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Icon(Icons.history, size: 64, color: Colors.grey),
             SizedBox(height: 16),
             Text(
-              'No translation history yet',
+              'Aún no hay historial de traducciones',
               style: TextStyle(fontSize: 18, color: Colors.grey),
             ),
           ],
@@ -207,11 +207,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final difference = now.difference(date);
 
     if (difference.inDays == 0) {
-      return 'Today ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      return 'Hoy ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays == 1) {
-      return 'Yesterday';
+      return 'Ayer';
     } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
+      return 'Hace ${difference.inDays} días';
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
