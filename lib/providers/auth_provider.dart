@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
@@ -13,13 +15,15 @@ class AuthProvider extends ChangeNotifier {
   String? _accessToken;
   String? _refreshToken;
   bool _isLoading = false;
+  bool _isInitialized = false;
   bool _isRefreshing = false;
   String? _error;
   bool _isVoiceEnabled = true;
 
   User? get user => _user;
   bool get isAuthenticated => _accessToken != null;
-  bool get isLoading => _isLoading;
+  bool get isLoading => _isLoading && !_isInitialized;
+  bool get isInitialized => _isInitialized;
   String? get error => _error;
   String? get accessToken => _accessToken;
   bool get isVoiceEnabled => _isVoiceEnabled;
@@ -29,17 +33,23 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _loadTokens() async {
-    _accessToken = await _secureStorage.getAccessToken();
-    _refreshToken = await _secureStorage.getRefreshToken();
+    try {
+      _accessToken = await _secureStorage.getAccessToken();
+      _refreshToken = await _secureStorage.getRefreshToken();
 
-    final prefs = await SharedPreferences.getInstance();
-    _isVoiceEnabled = prefs.getBool('is_voice_enabled') ?? true;
+      final prefs = await SharedPreferences.getInstance();
+      _isVoiceEnabled = prefs.getBool('is_voice_enabled') ?? true;
 
-    if (_accessToken != null) {
-      _apiService.setToken(_accessToken!);
-      await fetchCurrentUser();
+      if (_accessToken != null) {
+        _apiService.setToken(_accessToken!);
+        await fetchCurrentUser();
+      }
+    } catch (e) {
+      _error = 'No se pudo conectar al servidor';
+    } finally {
+      _isInitialized = true;
+      notifyListeners();
     }
-    notifyListeners();
   }
 
   Future<void> _saveTokens() async {
@@ -117,8 +127,23 @@ class AuthProvider extends ChangeNotifier {
       );
 
       return await login(username: username, password: password);
+    } on ApiException catch (e) {
+      _error = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } on SocketException {
+      _error = 'No hay conexión a internet. Verifica tu red.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } on TimeoutException {
+      _error = 'El servidor no responde. Intenta más tarde.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Error de conexión. Verifica tu internet.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -149,8 +174,23 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } on SocketException {
+      _error = 'No hay conexión a internet. Verifica tu red.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } on TimeoutException {
+      _error = 'El servidor no responde. Intenta más tarde.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Error de conexión. Verifica tu internet.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -173,8 +213,23 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
+    } on ApiException catch (e) {
+      _error = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } on SocketException {
+      _error = 'No hay conexión a internet. Verifica tu red.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    } on TimeoutException {
+      _error = 'El servidor no responde. Intenta más tarde.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     } catch (e) {
-      _error = e.toString();
+      _error = 'Error de conexión. Verifica tu internet.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -200,7 +255,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await _apiService.logout();
+    try {
+      await _apiService.logout();
+    } catch (_) {}
 
     _user = null;
     _accessToken = null;
@@ -238,11 +295,28 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return (true, null);
+    } on ApiException catch (e) {
+      _error = e.message;
+      _isLoading = false;
+      notifyListeners();
+      return (false, _error);
+    } on SocketException {
+      _error = 'No hay conexión a internet.';
+      _isLoading = false;
+      notifyListeners();
+      return (false, _error);
     } catch (e) {
-      _error = e.toString();
+      _error = 'Error de conexión.';
       _isLoading = false;
       notifyListeners();
       return (false, _error);
     }
+  }
+
+  Future<void> retryConnection() async {
+    _isInitialized = false;
+    _error = null;
+    notifyListeners();
+    await _loadTokens();
   }
 }

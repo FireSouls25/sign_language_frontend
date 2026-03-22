@@ -138,7 +138,7 @@ class ApiService {
   }) async {
     final response = await http
         .post(
-          Uri.parse('${ApiConfig.baseUrl}/api/auth/change-password'),
+          Uri.parse('${ApiConfig.baseUrl}/api/auth/me/change-password'),
           headers: _headers,
           body: jsonEncode({
             'current_password': currentPassword,
