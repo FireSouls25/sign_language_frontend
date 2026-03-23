@@ -71,18 +71,34 @@ class TranslationResult {
   final String text;
   final double confidence;
   final bool hasKeypoints;
+  final String phrase;
+  final bool isRecording;
+  final String candidate;
+  final double candidateConfidence;
+  final String? audio;
 
   TranslationResult({
     required this.text,
     required this.confidence,
     required this.hasKeypoints,
+    this.phrase = '',
+    this.isRecording = false,
+    this.candidate = '',
+    this.candidateConfidence = 0.0,
+    this.audio,
   });
 
   factory TranslationResult.fromJson(Map<String, dynamic> json) {
     return TranslationResult(
-      text: json['text'] as String,
-      confidence: (json['confidence'] as num).toDouble(),
-      hasKeypoints: json['has_keypoints'] as bool,
+      text: json['text'] as String? ?? '',
+      confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
+      hasKeypoints: json['has_keypoints'] as bool? ?? false,
+      phrase: json['phrase'] as String? ?? '',
+      isRecording: json['is_recording'] as bool? ?? false,
+      candidate: json['candidate'] as String? ?? '',
+      candidateConfidence:
+          (json['candidate_confidence'] as num?)?.toDouble() ?? 0.0,
+      audio: json['audio'] as String?,
     );
   }
 }

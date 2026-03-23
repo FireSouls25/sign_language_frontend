@@ -22,6 +22,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
+  int _currentCameraIndex = 0;
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
   final FlutterTts _flutterTts = FlutterTts();
 
@@ -59,19 +60,48 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       _cameras = await availableCameras();
       if (_cameras != null && _cameras!.isNotEmpty) {
-        _cameraController = CameraController(
-          _cameras![0],
-          ResolutionPreset.low,
-          imageFormatGroup: ImageFormatGroup.jpeg,
-        );
-        await _cameraController!.initialize();
-        if (mounted) {
-          setState(() => _isCameraInitialized = true);
-        }
+        await _setupCamera(_currentCameraIndex);
       }
     } catch (e) {
       debugPrint('Error initializing camera: $e');
     }
+  }
+
+  Future<void> _setupCamera(int cameraIndex) async {
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+    }
+
+    if (_cameras == null || _cameras!.isEmpty) {
+      return;
+    }
+
+    _cameraController = CameraController(
+      _cameras![cameraIndex],
+      ResolutionPreset.low,
+      imageFormatGroup: ImageFormatGroup.jpeg,
+    );
+
+    try {
+      await _cameraController!.initialize();
+      if (mounted) {
+        setState(() {
+          _currentCameraIndex = cameraIndex;
+          _isCameraInitialized = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error setting up camera: $e');
+    }
+  }
+
+  Future<void> _switchCamera() async {
+    if (_cameras == null || _cameras!.length < 2) {
+      return;
+    }
+
+    final newIndex = (_currentCameraIndex + 1) % _cameras!.length;
+    await _setupCamera(newIndex);
   }
 
   Future<void> _initializeWebSocket() async {
@@ -249,16 +279,31 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return Container(
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.deepPurple, width: 2),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: CameraPreview(_cameraController!),
-      ),
+    return Stack(
+      children: [
+        Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.deepPurple, width: 2),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: CameraPreview(_cameraController!),
+          ),
+        ),
+        if (_cameras != null && _cameras!.length > 1)
+          Positioned(
+            top: 16,
+            right: 16,
+            child: FloatingActionButton.small(
+              heroTag: 'switch_camera',
+              onPressed: _switchCamera,
+              backgroundColor: Colors.deepPurple.withOpacity(0.8),
+              child: const Icon(Icons.flip_camera_ios, color: Colors.white),
+            ),
+          ),
+      ],
     );
   }
 
