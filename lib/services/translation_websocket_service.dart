@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/api_config.dart';
 import '../models/translation.dart';
@@ -106,6 +107,14 @@ class TranslationWebSocketService {
     }
 
     _channel!.sink.add(jsonEncode({'type': 'frame', 'data': base64Image}));
+  }
+
+  void sendFrameBinary(Uint8List imageBytes) {
+    if (_channel == null || !_isConnected) {
+      throw Exception('WebSocket not connected');
+    }
+
+    _channel!.sink.add(imageBytes);
   }
 
   void sendReset() {

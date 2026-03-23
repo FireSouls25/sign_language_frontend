@@ -175,8 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
         } catch (_) {}
 
-        final base64Image = base64Encode(bytes);
-        _wsService.sendFrame(base64Image);
+        _wsService.sendFrameBinary(bytes);
       } catch (e) {
         debugPrint('Error sending frame: $e');
       }
