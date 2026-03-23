@@ -40,6 +40,7 @@ dependencies:
   url_launcher: ^6.2.0
   flutter_tts: ^4.2.5
   app_links: ^6.0.0
+  flutter_custom_tabs: ^2.0.0
   just_audio: ^0.9.42
   flutter_secure_storage: ^9.2.4
   sqflite: ^2.4.1

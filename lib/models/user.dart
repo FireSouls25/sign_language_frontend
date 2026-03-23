@@ -5,6 +5,7 @@ class User {
   final String fullName;
   final int translationCount;
   final DateTime createdAt;
+  final bool isVerified;
 
   User({
     required this.id,
@@ -13,6 +14,7 @@ class User {
     required this.fullName,
     required this.translationCount,
     required this.createdAt,
+    this.isVerified = false,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class User {
       fullName: json['full_name'] as String,
       translationCount: json['translation_count'] as int? ?? 0,
       createdAt: DateTime.parse(json['created_at'] as String),
+      isVerified: json['is_verified'] as bool? ?? false,
     );
   }
 
@@ -34,6 +37,7 @@ class User {
       'full_name': fullName,
       'translation_count': translationCount,
       'created_at': createdAt.toIso8601String(),
+      'is_verified': isVerified,
     };
   }
 }

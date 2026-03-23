@@ -59,11 +59,16 @@ class ApiService {
     if (response.statusCode == 201) {
       return User.fromJson(jsonDecode(response.body));
     } else {
-      final error = jsonDecode(response.body);
-      throw ApiException(
-        error['detail'] ?? 'Registration failed',
-        statusCode: response.statusCode,
-      );
+      String detail;
+      try {
+        final error = jsonDecode(response.body);
+        detail = error['detail'] ?? 'Registration failed';
+      } catch (_) {
+        detail = response.body.isNotEmpty
+            ? response.body
+            : 'Registration failed (HTTP ${response.statusCode})';
+      }
+      throw ApiException(detail, statusCode: response.statusCode);
     }
   }
 
@@ -82,11 +87,16 @@ class ApiService {
     if (response.statusCode == 200) {
       return AuthTokens.fromJson(jsonDecode(response.body));
     } else {
-      final error = jsonDecode(response.body);
-      throw ApiException(
-        error['detail'] ?? 'Login failed',
-        statusCode: response.statusCode,
-      );
+      String detail;
+      try {
+        final error = jsonDecode(response.body);
+        detail = error['detail'] ?? 'Login failed';
+      } catch (_) {
+        detail = response.body.isNotEmpty
+            ? response.body
+            : 'Login failed (HTTP ${response.statusCode})';
+      }
+      throw ApiException(detail, statusCode: response.statusCode);
     }
   }
 
