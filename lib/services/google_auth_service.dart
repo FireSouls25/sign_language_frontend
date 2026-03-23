@@ -1,9 +1,9 @@
 import 'package:flutter_appauth/flutter_appauth.dart';
 
 const String _clientId =
-    '908648917103-qhfpi7jnnou8mp2hnhig1r66gr31p4oc.apps.googleusercontent.com';
+    '908648917103-g1q1qh4f8bln3fukvd3h335a1g1bieak.apps.googleusercontent.com';
 const String _redirectUrl =
-    'com.googleusercontent.apps.908648917103-qhfpi7jnnou8mp2hnhig1r66gr31p4oc:/oauth2redirect';
+    'com.googleusercontent.apps.908648917103-g1q1qh4f8bln3fukvd3h335a1g1bieak:/oauth2redirect';
 const String _discoveryUrl =
     'https://accounts.google.com/.well-known/openid-configuration';
 
