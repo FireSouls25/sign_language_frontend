@@ -1,6 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
-import '../services/oauth_service.dart';
+import 'oauth_service.dart';
 
 class DeepLinkService {
   static final DeepLinkService _instance = DeepLinkService._internal();
@@ -8,49 +7,37 @@ class DeepLinkService {
   DeepLinkService._internal();
 
   final _deeplinkController = StreamController<OAuthTokens>.broadcast();
+  final _errorController = StreamController<String>.broadcast();
 
   Stream<OAuthTokens> get onOAuthCallback => _deeplinkController.stream;
+  Stream<String> get onOAuthError => _errorController.stream;
 
-  bool handleUri(Uri uri) {
-    if (uri.scheme == 'lsc' && uri.host == 'oauth') {
-      if (uri.path == '/callback') {
-        final accessToken = uri.queryParameters['access_token'];
-        final refreshToken = uri.queryParameters['refresh_token'];
-        final tokenType = uri.queryParameters['token_type'] ?? 'bearer';
+  void handleUri(Uri uri) {
+    if (uri.scheme == 'lsc' && uri.host == 'oauth' && uri.path == '/callback') {
+      final error = uri.queryParameters['error'];
+      if (error != null) {
+        _errorController.add(error);
+        return;
+      }
 
-        if (accessToken != null && refreshToken != null) {
-          final tokens = OAuthTokens(
+      final accessToken = uri.queryParameters['access_token'];
+      final refreshToken = uri.queryParameters['refresh_token'];
+      final tokenType = uri.queryParameters['token_type'] ?? 'bearer';
+
+      if (accessToken != null && refreshToken != null) {
+        _deeplinkController.add(
+          OAuthTokens(
             accessToken: accessToken,
             refreshToken: refreshToken,
             tokenType: tokenType,
-          );
-          _deeplinkController.add(tokens);
-          return true;
-        }
+          ),
+        );
       }
     }
-    return false;
   }
 
   void dispose() {
     _deeplinkController.close();
-  }
-}
-
-class DeepLinkWrapper extends StatefulWidget {
-  final Widget child;
-
-  const DeepLinkWrapper({super.key, required this.child});
-
-  @override
-  State<DeepLinkWrapper> createState() => _DeepLinkWrapperState();
-}
-
-class _DeepLinkWrapperState extends State<DeepLinkWrapper> {
-  final DeepLinkService _deeplinkService = DeepLinkService();
-
-  @override
-  Widget build(BuildContext context) {
-    return widget.child;
+    _errorController.close();
   }
 }

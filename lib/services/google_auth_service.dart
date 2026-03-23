@@ -1,61 +1,24 @@
-import 'package:flutter_appauth/flutter_appauth.dart';
-
-const String _clientId =
-    '908648917103-g1q1qh4f8bln3fukvd3h335a1g1bieak.apps.googleusercontent.com';
-const String _redirectUrl =
-    'com.googleusercontent.apps.908648917103-g1q1qh4f8bln3fukvd3h335a1g1bieak:/oauth2redirect';
-const String _discoveryUrl =
-    'https://accounts.google.com/.well-known/openid-configuration';
+import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
+import '../config/api_config.dart';
 
 class GoogleAuthService {
-  final FlutterAppAuth _appAuth = const FlutterAppAuth();
-
-  Future<GoogleSignInResult> signIn() async {
-    try {
-      final result = await _appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
-          _clientId,
-          _redirectUrl,
-          discoveryUrl: _discoveryUrl,
-          scopes: ['email', 'profile', 'openid'],
+  Future<void> signIn() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/auth/login/google');
+    await launchUrl(
+      url,
+      customTabsOptions: const CustomTabsOptions(
+        colorSchemes: CustomTabsColorSchemes(
+          colorScheme: CustomTabsColorScheme.system,
         ),
-      );
-
-      if (result == null) {
-        return GoogleSignInResult(success: false, error: 'sign_in_cancelled');
-      }
-
-      return GoogleSignInResult(
-        success: true,
-        idToken: result.idToken,
-        accessToken: result.accessToken,
-      );
-    } catch (e) {
-      final error = e.toString();
-      if (error.contains('cancel') || error.contains('dismiss')) {
-        return GoogleSignInResult(success: false, error: 'sign_in_cancelled');
-      }
-      return GoogleSignInResult(success: false, error: error);
-    }
+        showTitle: false,
+        urlBarHidingEnabled: true,
+        shareState: CustomTabsShareState.off,
+        instantAppsEnabled: false,
+      ),
+      safariVCOptions: const SafariViewControllerOptions(
+        barCollapsingEnabled: true,
+        dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
+      ),
+    );
   }
-}
-
-class GoogleSignInResult {
-  final bool success;
-  final String? idToken;
-  final String? accessToken;
-  final String? email;
-  final String? displayName;
-  final String? photoUrl;
-  final String? error;
-
-  GoogleSignInResult({
-    required this.success,
-    this.idToken,
-    this.accessToken,
-    this.email,
-    this.displayName,
-    this.photoUrl,
-    this.error,
-  });
 }

@@ -1,18 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:app_links/app_links.dart';
 import 'config/api_config.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'services/deep_link_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const LSCTranslatorApp());
 }
 
-class LSCTranslatorApp extends StatelessWidget {
+class LSCTranslatorApp extends StatefulWidget {
   const LSCTranslatorApp({super.key});
+
+  @override
+  State<LSCTranslatorApp> createState() => _LSCTranslatorAppState();
+}
+
+class _LSCTranslatorAppState extends State<LSCTranslatorApp> {
+  final _appLinks = AppLinks();
+
+  @override
+  void initState() {
+    super.initState();
+    _appLinks.uriLinkStream.listen((uri) {
+      DeepLinkService().handleUri(uri);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

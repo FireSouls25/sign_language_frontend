@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/google_auth_service.dart';
+import '../services/deep_link_service.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
 
@@ -204,34 +206,17 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loginWithGoogle() async {
     final authProvider = context.read<AuthProvider>();
 
-    final result = await _googleAuthService.signIn();
-
-    if (!result.success) {
-      if (result.error != 'sign_in_cancelled' && mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: ${result.error}')));
-      }
-      return;
-    }
-
-    if (result.idToken == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo obtener el token de Google'),
-          ),
+    final sub = DeepLinkService().onOAuthCallback.listen((tokens) async {
+      final success = await authProvider.loginWithOAuth(tokens);
+      if (success && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       }
-      return;
-    }
+    });
 
-    final success = await authProvider.loginWithGoogleToken(result.idToken!);
+    await _googleAuthService.signIn();
 
-    if (success && mounted) {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
-    }
+    Future.delayed(const Duration(minutes: 5), () => sub.cancel());
   }
 }
