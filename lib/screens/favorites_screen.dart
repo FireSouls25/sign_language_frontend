@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:just_audio/just_audio.dart';
 import '../models/translation.dart';
 import '../providers/auth_provider.dart';
 import '../services/database_service.dart';
@@ -49,7 +49,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _playAudio(String? audioUrl) async {
     if (audioUrl == null || audioUrl.isEmpty) return;
     try {
-      await _audioPlayer.play(UrlSource(audioUrl));
+      await _audioPlayer.setUrl(audioUrl);
+      await _audioPlayer.play();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -124,16 +125,21 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceVariant.withOpacity(0.3),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: Theme.of(context).dividerColor),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     child: Text(
                       translation.textResult,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),

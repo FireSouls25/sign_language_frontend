@@ -56,12 +56,19 @@ class DatabaseService {
   // Logs (Errores Técnicos)
   Future<void> insertLog(Log log) async {
     final db = await database;
-    await db.insert('logs', log.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert(
+      'logs',
+      log.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<List<Log>> getLogs() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('logs', orderBy: 'timestamp DESC');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'logs',
+      orderBy: 'timestamp DESC',
+    );
     return List.generate(maps.length, (i) => Log.fromMap(maps[i]));
   }
 
@@ -76,7 +83,8 @@ class DatabaseService {
     final batch = db.batch();
     for (var t in translations) {
       // Usamos ON CONFLICT para actualizar los datos del servidor sin perder el favorito local
-      batch.execute('''
+      batch.execute(
+        '''
         INSERT INTO offline_translations (id, user_id, text_result, audio_url, confidence_score, created_at, is_favorite)
         VALUES (?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
@@ -85,15 +93,17 @@ class DatabaseService {
           audio_url = excluded.audio_url,
           confidence_score = excluded.confidence_score,
           created_at = excluded.created_at
-      ''', [
-        t.id,
-        t.userId,
-        t.textResult,
-        t.audioUrl,
-        t.confidenceScore,
-        t.createdAt.toIso8601String(),
-        t.isFavorite ? 1 : 0,
-      ]);
+      ''',
+        [
+          t.id,
+          t.userId,
+          t.textResult,
+          t.audioUrl,
+          t.confidenceScore,
+          t.createdAt.toIso8601String(),
+          t.isFavorite ? 1 : 0,
+        ],
+      );
     }
     await batch.commit(noResult: true);
   }
@@ -125,8 +135,59 @@ class DatabaseService {
       'offline_translations',
       where: 'user_id = ?',
       whereArgs: [userId],
-      orderBy: 'created_at DESC'
+      orderBy: 'created_at DESC',
     );
     return List.generate(maps.length, (i) => Translation.fromJson(maps[i]));
+  }
+
+  // TranslationRepository methods
+  Future<List<Map<String, dynamic>>> getTranslations({
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final db = await database;
+    return await db.query(
+      'offline_translations',
+      orderBy: 'created_at DESC',
+      limit: limit,
+      offset: offset,
+    );
+  }
+
+  Future<void> insertTranslation(Map<String, dynamic> translation) async {
+    final db = await database;
+    await db.insert(
+      'offline_translations',
+      translation,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteTranslation(String id) async {
+    final db = await database;
+    await db.delete('offline_translations', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> deleteAllTranslations() async {
+    final db = await database;
+    await db.delete('offline_translations');
+  }
+
+  Future<int> getTranslationCount() async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM offline_translations',
+    );
+    return result.first['count'] as int;
+  }
+
+  Future<List<Map<String, dynamic>>> searchTranslations(String query) async {
+    final db = await database;
+    return await db.query(
+      'offline_translations',
+      where: 'text_result LIKE ?',
+      whereArgs: ['%$query%'],
+      orderBy: 'created_at DESC',
+    );
   }
 }
