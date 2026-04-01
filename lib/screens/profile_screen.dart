@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../config/theme_config.dart';
+import 'logs_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -51,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   Text(
                     '@${user.username}',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(color: AppTheme.getTextSecondary(context)),
                   ),
                   const SizedBox(height: 32),
                   _buildSectionTitle('Información Personal'),
@@ -67,6 +69,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       context.read<ThemeProvider>().toggleTheme(value);
                     },
                     secondary: const Icon(Icons.dark_mode),
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    title: const Text('Botón de tema en AppBar'),
+                    subtitle: const Text(
+                      'Mostrar botón para cambiar modo en barra superior',
+                    ),
+                    value: context.watch<ThemeProvider>().showAppBarToggle,
+                    activeColor: Theme.of(context).colorScheme.primary,
+                    onChanged: (bool value) {
+                      context.read<ThemeProvider>().setShowAppBarToggle(value);
+                    },
+                    secondary: Icon(
+                      Icons.app_settings_alt,
+                      color: AppTheme.getIconPrimary(context),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Padding(
@@ -98,11 +116,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       'Escuchar la traducción automáticamente',
                     ),
                     value: authProvider.isVoiceEnabled,
-                    activeColor: Colors.deepPurple,
+                    activeColor: Theme.of(context).colorScheme.primary,
                     onChanged: (bool value) {
                       authProvider.toggleVoice(value);
                     },
                     secondary: const Icon(Icons.volume_up),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: Icon(
+                      Icons.bug_report,
+                      color: AppTheme.getIconPrimary(context),
+                    ),
+                    title: const Text('Logs del Sistema'),
+                    subtitle: const Text('Ver errores técnicos'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LogsScreen()),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   _buildSectionTitle('Seguridad'),
@@ -146,10 +178,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Colors.deepPurple,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
       ),
@@ -159,14 +191,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildInfoTile(IconData icon, String label, String value) {
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: Colors.deepPurple),
+      leading: Icon(icon, color: Theme.of(context).colorScheme.primary),
       title: Text(
         label,
-        style: const TextStyle(fontSize: 12, color: Colors.grey),
+        style: TextStyle(
+          fontSize: 12,
+          color: AppTheme.getTextSecondary(context),
+        ),
       ),
       subtitle: Text(
         value,
-        style: const TextStyle(fontSize: 16, color: Colors.black87),
+        style: TextStyle(fontSize: 16, color: AppTheme.getTextPrimary(context)),
       ),
     );
   }

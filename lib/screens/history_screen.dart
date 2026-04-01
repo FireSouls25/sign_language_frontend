@@ -4,6 +4,8 @@ import 'package:just_audio/just_audio.dart';
 import '../models/translation.dart';
 import '../services/translation_repository.dart';
 import '../providers/auth_provider.dart';
+import '../services/error_translator.dart';
+import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -22,6 +24,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   bool _isSyncing = false;
   String? _error;
   bool _isOffline = false;
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -33,6 +38,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -57,8 +63,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _isOffline = false;
       });
     } catch (e) {
+      ErrorTranslator.translate(e);
       setState(() {
-        _error = e.toString();
+        _error = ErrorTranslator.translate(e);
         _isLoading = false;
         _isOffline = true;
       });
@@ -77,10 +84,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       await _repository.syncFromServer();
       await _loadHistory(forceRefresh: true);
     } catch (e) {
+      ErrorTranslator.translate(e);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error al sincronizar: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error al sincronizar: ${ErrorTranslator.translate(e)}',
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -114,7 +126,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.cloud_off,
+              size: 64,
+              color: AppTheme.getTextSecondary(context),
+            ),
             const SizedBox(height: 16),
             Text(
               _isOffline ? 'Sin conexión a internet' : 'Error al cargar',
@@ -122,9 +138,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             if (_isOffline) ...[
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Mostrando datos guardados localmente',
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: AppTheme.getTextSecondary(context)),
               ),
             ],
             const SizedBox(height: 16),
@@ -145,11 +161,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.history,
+              size: 64,
+              color: AppTheme.getTextSecondary(context),
+            ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Aún no hay historial de traducciones',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 18,
+                color: AppTheme.getTextSecondary(context),
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -169,6 +192,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         itemCount: _translations.length,
         itemBuilder: (context, index) {
           final translation = _translations[index];
+          if (_searchQuery.isNotEmpty &&
+              !translation.textResult.toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              )) {
+            return const SizedBox.shrink();
+          }
           return _buildTranslationCard(translation);
         },
       ),
@@ -183,7 +212,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
         color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: Icon(
+          Icons.delete,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
       ),
       onDismissed: (_) async {
         await _repository.deleteTranslation(translation.id);
@@ -219,7 +251,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   if (translation.audioUrl != null)
                     IconButton(
                       icon: const Icon(Icons.volume_up),
-                      color: Colors.deepPurple,
+                      color: Theme.of(context).colorScheme.primary,
                       onPressed: () => _playAudio(translation.audioUrl),
                     ),
                 ],
@@ -230,7 +262,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 children: [
                   Text(
                     _formatDate(translation.createdAt),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: TextStyle(
+                      color: AppTheme.getTextSecondary(context),
+                      fontSize: 12,
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -243,8 +278,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                     child: Text(
                       '${(translation.confidenceScore * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -287,23 +322,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
         title: 'Historial de Traducciones',
         actions: [
           if (_isSyncing)
-            const Padding(
-              padding: EdgeInsets.all(12),
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
             )
           else
             IconButton(
-              icon: const Icon(Icons.sync),
-              onPressed: _syncFromServer,
-              tooltip: 'Sincronizar',
+              icon: Icon(_isSearching ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) {
+                    _searchController.clear();
+                    _searchQuery = '';
+                  }
+                });
+              },
+              tooltip: _isSearching ? 'Cerrar' : 'Buscar',
             ),
+          IconButton(
+            icon: const Icon(Icons.sync),
+            onPressed: _syncFromServer,
+            tooltip: 'Sincronizar',
+          ),
         ],
       ),
       body: _buildBody(),

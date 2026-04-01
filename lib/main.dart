@@ -7,9 +7,18 @@ import 'providers/theme_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/deep_link_service.dart';
+import 'services/error_translator.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    ErrorTranslator.saveUnhandledError(
+      exception: details.exception,
+      stackTrace: details.stack ?? StackTrace.current,
+    );
+  };
+
   runApp(const LSCTranslatorApp());
 }
 
