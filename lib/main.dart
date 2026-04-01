@@ -48,7 +48,7 @@ class _LSCTranslatorAppState extends State<LSCTranslatorApp> {
                 : ThemeMode.light,
             theme: ThemeData(
               colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.deepPurple,
+                seedColor: themeProvider.seedColor,
                 brightness: Brightness.light,
               ),
               useMaterial3: true,
@@ -72,7 +72,7 @@ class _LSCTranslatorAppState extends State<LSCTranslatorApp> {
             ),
             darkTheme: ThemeData(
               colorScheme: ColorScheme.fromSeed(
-                seedColor: Colors.deepPurple,
+                seedColor: themeProvider.seedColor,
                 brightness: Brightness.dark,
               ),
               useMaterial3: true,

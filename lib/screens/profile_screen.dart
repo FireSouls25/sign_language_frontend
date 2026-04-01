@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
-import '../widgets/ls_app_bar.dart';
+import 'logs_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,9 +18,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = authProvider.user;
 
     return Scaffold(
-      appBar: const LSAppBar(
-        title: 'Mi Perfil',
-        automaticallyImplyLeading: true,
+      appBar: AppBar(
+        title: const Text('Mi Perfil'),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
       body: user == null
           ? const Center(child: CircularProgressIndicator())
@@ -31,12 +32,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   CircleAvatar(
                     radius: 50,
-                    backgroundColor: Colors.deepPurple,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
                     child: Text(
                       user.fullName.isNotEmpty
                           ? user.fullName[0].toUpperCase()
                           : '?',
-                      style: const TextStyle(fontSize: 40, color: Colors.white),
+                      style: TextStyle(
+                        fontSize: 40,
+                        color: Theme.of(context).colorScheme.onPrimary,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -59,12 +63,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     title: const Text('Modo Oscuro'),
                     subtitle: const Text('Cambiar el aspecto de la aplicación'),
                     value: context.watch<ThemeProvider>().isDarkMode,
-                    activeColor: Colors.deepPurple,
+                    activeColor: Theme.of(context).colorScheme.primary,
                     onChanged: (bool value) {
                       context.read<ThemeProvider>().toggleTheme(value);
                     },
                     secondary: const Icon(Icons.dark_mode),
                   ),
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Color de Acento',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildColorOption(context, Colors.deepPurple, 'Morado'),
+                        _buildColorOption(context, Colors.blue, 'Azul'),
+                        _buildColorOption(context, Colors.teal, 'Verde'),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   SwitchListTile(
                     title: const Text('Reproducción de Voz (TTS)'),
                     subtitle: const Text(
@@ -270,6 +298,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildColorOption(BuildContext context, Color color, String label) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final isSelected = themeProvider.seedColor.value == color.value;
+
+    return GestureDetector(
+      onTap: () => themeProvider.setSeedColor(color),
+      child: Column(
+        children: [
+          Container(
+            width: 35,
+            height: 35,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: isSelected
+                  ? Border.all(
+                      color: Theme.of(context).colorScheme.outline,
+                      width: 2,
+                    )
+                  : null,
+            ),
+            child: isSelected
+                ? const Icon(Icons.check, color: Colors.white, size: 18)
+                : null,
+          ),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 10)),
+        ],
       ),
     );
   }
