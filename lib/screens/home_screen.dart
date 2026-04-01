@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
+import 'package:hand_landmarker/hand_landmarker.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
@@ -29,6 +31,11 @@ class _HomeScreenState extends State<HomeScreen> {
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
   final FlutterTts _flutterTts = FlutterTts();
 
+  HandLandmarkerPlugin? _handLandmarker;
+  int _frameCounter = 0;
+  static const int _framesToProcess = 5;
+  bool _isHandLandmarkerInitialized = false;
+
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
   String _currentTranslation = '';
@@ -43,9 +50,25 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _isVoiceEnabled = context.read<AuthProvider>().isVoiceEnabled;
+    _initializeHandLandmarker();
     _initializeCamera();
     _initializeWebSocket();
     _initializeTts();
+  }
+
+  Future<void> _initializeHandLandmarker() async {
+    try {
+      _handLandmarker = HandLandmarkerPlugin.create(
+        numHands: 2,
+        minHandDetectionConfidence: 0.5,
+        delegate: HandLandmarkerDelegate.gpu,
+      );
+      _isHandLandmarkerInitialized = true;
+      debugPrint('HandLandmarker initialized successfully');
+    } catch (e) {
+      debugPrint('Error initializing HandLandmarker: $e');
+      _isHandLandmarkerInitialized = false;
+    }
   }
 
   Future<void> _initializeTts() async {
@@ -163,41 +186,82 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    _frameCounter = 0;
+
     setState(() {
       _isTranslating = true;
       _currentTranslation = '';
       _confidence = 0.0;
     });
 
-    _frameTimer = Timer.periodic(const Duration(milliseconds: 500), (
-      timer,
-    ) async {
+    _cameraController!.startImageStream((CameraImage image) async {
       if (!_wsService.isConnected || _cameraController == null) {
-        timer.cancel();
         return;
       }
 
       try {
-        final image = await _cameraController!.takePicture();
-        final bytes = await image.readAsBytes();
+        _frameCounter++;
 
-        try {
-          final file = File(image.path);
-          if (await file.exists()) {
-            await file.delete();
+        if (_frameCounter >= _framesToProcess &&
+            _isHandLandmarkerInitialized &&
+            _handLandmarker != null) {
+          _frameCounter = 0;
+
+          final landmarks = _processImageForLandmarks(image);
+
+          if (landmarks['left_hand'] != null ||
+              landmarks['right_hand'] != null) {
+            _wsService.sendLandmarks(landmarks);
           }
-        } catch (_) {}
+        }
 
+        final bytes = image.planes.first.bytes;
         _wsService.sendFrameBinary(bytes);
       } catch (e) {
-        debugPrint('Error sending frame: $e');
+        debugPrint('Error in frame processing: $e');
       }
     });
   }
 
+  Map<String, List<List<double>>> _processImageForLandmarks(CameraImage image) {
+    Map<String, List<List<double>>> landmarks = {};
+
+    if (_handLandmarker == null || !_isHandLandmarkerInitialized) {
+      return landmarks;
+    }
+
+    try {
+      final result = _handLandmarker!.detect(
+        image,
+        _cameraController!.description.sensorOrientation,
+      );
+
+      if (result != null && result.isNotEmpty) {
+        for (int i = 0; i < result.length; i++) {
+          final hand = result[i];
+          final handLandmarks = hand.landmarks
+              .map((point) => [point.x, point.y, point.z])
+              .toList();
+
+          if (i == 0) {
+            landmarks['left_hand'] = handLandmarks;
+          } else if (i == 1) {
+            landmarks['right_hand'] = handLandmarks;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error processing image for landmarks: $e');
+    }
+
+    return landmarks;
+  }
+
   void _stopTranslation() {
+    _cameraController?.stopImageStream();
     _frameTimer?.cancel();
     _frameTimer = null;
+    _frameCounter = 0;
 
     if (_wsService.isConnected) {
       _wsService.sendReset();
@@ -244,6 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _wsService.dispose();
     _flutterTts.stop();
     _cameraController?.dispose();
+    _handLandmarker?.dispose();
     super.dispose();
   }
 

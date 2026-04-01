@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/api_config.dart';
 import '../models/translation.dart';
@@ -111,10 +112,27 @@ class TranslationWebSocketService {
 
   void sendFrameBinary(Uint8List imageBytes) {
     if (_channel == null || !_isConnected) {
-      throw Exception('WebSocket not connected');
+      return;
     }
 
     _channel!.sink.add(imageBytes);
+  }
+
+  void sendLandmarks(Map<String, List<List<double>>> landmarks) {
+    if (_channel == null || !_isConnected) {
+      return;
+    }
+
+    try {
+      final message = jsonEncode({
+        'type': 'landmarks',
+        'data': landmarks,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      _channel!.sink.add(message);
+    } catch (e) {
+      debugPrint('Error sending landmarks: $e');
+    }
   }
 
   void sendReset() {
