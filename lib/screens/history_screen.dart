@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import '../models/translation.dart';
 import '../services/translation_repository.dart';
 import '../providers/auth_provider.dart';
+import '../services/error_translator.dart';
 import '../widgets/ls_app_bar.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -22,6 +23,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   bool _isSyncing = false;
   String? _error;
   bool _isOffline = false;
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -33,6 +37,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void dispose() {
     _audioPlayer.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -57,8 +62,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         _isOffline = false;
       });
     } catch (e) {
+      ErrorTranslator.translate(e);
       setState(() {
-        _error = e.toString();
+        _error = ErrorTranslator.translate(e);
         _isLoading = false;
         _isOffline = true;
       });
@@ -77,10 +83,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
       await _repository.syncFromServer();
       await _loadHistory(forceRefresh: true);
     } catch (e) {
+      ErrorTranslator.translate(e);
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error al sincronizar: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Error al sincronizar: ${ErrorTranslator.translate(e)}',
+            ),
+          ),
+        );
       }
     } finally {
       if (mounted) {
@@ -169,6 +180,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
         itemCount: _translations.length,
         itemBuilder: (context, index) {
           final translation = _translations[index];
+          if (_searchQuery.isNotEmpty &&
+              !translation.textResult.toLowerCase().contains(
+                _searchQuery.toLowerCase(),
+              )) {
+            return const SizedBox.shrink();
+          }
           return _buildTranslationCard(translation);
         },
       ),
@@ -300,10 +317,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
             )
           else
             IconButton(
-              icon: const Icon(Icons.sync),
-              onPressed: _syncFromServer,
-              tooltip: 'Sincronizar',
+              icon: Icon(_isSearching ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  _isSearching = !_isSearching;
+                  if (!_isSearching) {
+                    _searchController.clear();
+                    _searchQuery = '';
+                  }
+                });
+              },
+              tooltip: _isSearching ? 'Cerrar' : 'Buscar',
             ),
+          IconButton(
+            icon: const Icon(Icons.sync),
+            onPressed: _syncFromServer,
+            tooltip: 'Sincronizar',
+          ),
         ],
       ),
       body: _buildBody(),

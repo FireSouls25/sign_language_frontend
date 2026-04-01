@@ -6,6 +6,7 @@ import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/oauth_service.dart';
 import '../services/secure_storage_service.dart';
+import '../services/error_translator.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -63,6 +64,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
+      ErrorTranslator.translate(e);
       _error = 'Error de conexión con Google.';
       _isLoading = false;
       notifyListeners();
@@ -87,6 +89,7 @@ class AuthProvider extends ChangeNotifier {
         await fetchCurrentUser();
       }
     } catch (e) {
+      ErrorTranslator.translate(e);
       _error = 'No se pudo conectar al servidor';
     } finally {
       _isInitialized = true;
@@ -125,6 +128,7 @@ class AuthProvider extends ChangeNotifier {
       _isRefreshing = false;
       return true;
     } catch (e) {
+      ErrorTranslator.translate(e);
       _isRefreshing = false;
       return false;
     }
@@ -185,6 +189,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
+      ErrorTranslator.translate(e);
       _error = 'Error de conexión. Verifica tu internet.';
       _isLoading = false;
       notifyListeners();
@@ -232,6 +237,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
+      ErrorTranslator.translate(e);
       _error = 'Error de conexión. Verifica tu internet.';
       _isLoading = false;
       notifyListeners();
@@ -271,6 +277,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     } catch (e) {
+      ErrorTranslator.translate(e);
       _error = 'Error de conexión. Verifica tu internet.';
       _isLoading = false;
       notifyListeners();
@@ -285,6 +292,7 @@ class AuthProvider extends ChangeNotifier {
       _user = await _apiService.getCurrentUser();
       notifyListeners();
     } catch (e) {
+      ErrorTranslator.translate(e);
       if (e is ApiException && e.statusCode == 401) {
         final refreshed = await _tryRefreshToken();
         if (refreshed) {
@@ -348,6 +356,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return (false, _error);
     } catch (e) {
+      ErrorTranslator.translate(e);
       _error = 'Error de conexión.';
       _isLoading = false;
       notifyListeners();

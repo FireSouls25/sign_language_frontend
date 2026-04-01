@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import 'logs_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -103,6 +104,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       authProvider.toggleVoice(value);
                     },
                     secondary: const Icon(Icons.volume_up),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: const Icon(Icons.bug_report, color: Colors.orange),
+                    title: const Text('Logs del Sistema'),
+                    subtitle: const Text('Ver errores técnicos'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LogsScreen()),
+                    ),
                   ),
                   const SizedBox(height: 24),
                   _buildSectionTitle('Seguridad'),

@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import '../models/translation.dart';
 import '../providers/auth_provider.dart';
 import '../services/database_service.dart';
+import '../services/error_translator.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -38,6 +39,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         });
       }
     } catch (e) {
+      ErrorTranslator.translate(e);
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -52,6 +54,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       await _audioPlayer.setUrl(audioUrl);
       await _audioPlayer.play();
     } catch (e) {
+      ErrorTranslator.translate(e);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Falló la reproducción del audio')),
