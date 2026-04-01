@@ -193,15 +193,16 @@ class ApiService {
     final response = await http
         .get(
           Uri.parse(
-            '${ApiConfig.baseUrl}/api/translation?limit=$limit&offset=$offset',
+            '${ApiConfig.baseUrl}/api/translation?size=$limit&page=${(offset ~/ limit) + 1}',
           ),
           headers: _headers,
         )
         .timeout(_timeout);
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
-      return data.map((json) => Translation.fromJson(json)).toList();
+      final Map<String, dynamic> data = jsonDecode(response.body);
+      final List<dynamic> items = data['items'] ?? [];
+      return items.map((json) => Translation.fromJson(json)).toList();
     } else {
       throw ApiException(
         'Failed to get translation history',
