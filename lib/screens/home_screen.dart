@@ -227,6 +227,7 @@ class _HomeScreenState extends State<HomeScreen> {
     Map<String, List<List<double>>> landmarks = {};
 
     if (_handLandmarker == null || !_isHandLandmarkerInitialized) {
+      debugPrint('[HomeScreen] HandLandmarker not initialized');
       return landmarks;
     }
 
@@ -237,11 +238,16 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (result != null && result.isNotEmpty) {
+        debugPrint('[HomeScreen] Detected ${result.length} hand(s)');
         for (int i = 0; i < result.length; i++) {
           final hand = result[i];
           final handLandmarks = hand.landmarks
               .map((point) => [point.x, point.y, point.z])
               .toList();
+
+          debugPrint(
+            '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks',
+          );
 
           if (i == 0) {
             landmarks['left_hand'] = handLandmarks;
@@ -249,9 +255,11 @@ class _HomeScreenState extends State<HomeScreen> {
             landmarks['right_hand'] = handLandmarks;
           }
         }
+      } else {
+        debugPrint('[HomeScreen] No hands detected in frame');
       }
     } catch (e) {
-      debugPrint('Error processing image for landmarks: $e');
+      debugPrint('[HomeScreen] Error processing image for landmarks: $e');
     }
 
     return landmarks;
