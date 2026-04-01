@@ -5,6 +5,7 @@ import '../models/translation.dart';
 import '../providers/auth_provider.dart';
 import '../services/database_service.dart';
 import '../services/error_translator.dart';
+import '../config/theme_config.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -75,7 +76,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       appBar: AppBar(
         title: const Text('Mis Favoritos'),
         backgroundColor: Colors.redAccent,
-        foregroundColor: Colors.white,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
       body: _buildBody(),
     );
@@ -87,15 +88,22 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
 
     if (_favorites.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.favorite_border, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            Icon(
+              Icons.favorite_border,
+              size: 64,
+              color: AppTheme.getTextSecondary(context),
+            ),
+            const SizedBox(height: 16),
             Text(
               'Aún no tienes traducciones favoritas',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 18,
+                color: AppTheme.getTextSecondary(context),
+              ),
             ),
           ],
         ),
@@ -166,7 +174,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             const SizedBox(height: 8),
             Text(
               _formatDate(translation.createdAt),
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              style: TextStyle(
+                color: AppTheme.getTextSecondary(context),
+                fontSize: 12,
+              ),
             ),
           ],
         ),

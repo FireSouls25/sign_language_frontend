@@ -5,6 +5,7 @@ import '../models/translation.dart';
 import '../services/translation_repository.dart';
 import '../providers/auth_provider.dart';
 import '../services/error_translator.dart';
+import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -125,7 +126,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.cloud_off,
+              size: 64,
+              color: AppTheme.getTextSecondary(context),
+            ),
             const SizedBox(height: 16),
             Text(
               _isOffline ? 'Sin conexión a internet' : 'Error al cargar',
@@ -133,9 +138,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             if (_isOffline) ...[
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Mostrando datos guardados localmente',
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: AppTheme.getTextSecondary(context)),
               ),
             ],
             const SizedBox(height: 16),
@@ -156,11 +161,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.history, size: 64, color: Colors.grey[400]),
+            Icon(
+              Icons.history,
+              size: 64,
+              color: AppTheme.getTextSecondary(context),
+            ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Aún no hay historial de traducciones',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 18,
+                color: AppTheme.getTextSecondary(context),
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -200,7 +212,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
         color: Colors.red,
-        child: const Icon(Icons.delete, color: Colors.white),
+        child: Icon(
+          Icons.delete,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
       ),
       onDismissed: (_) async {
         await _repository.deleteTranslation(translation.id);
@@ -236,7 +251,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   if (translation.audioUrl != null)
                     IconButton(
                       icon: const Icon(Icons.volume_up),
-                      color: Colors.deepPurple,
+                      color: Theme.of(context).colorScheme.primary,
                       onPressed: () => _playAudio(translation.audioUrl),
                     ),
                 ],
@@ -247,7 +262,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 children: [
                   Text(
                     _formatDate(translation.createdAt),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    style: TextStyle(
+                      color: AppTheme.getTextSecondary(context),
+                      fontSize: 12,
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -260,8 +278,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                     child: Text(
                       '${(translation.confidenceScore * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -304,14 +322,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
         title: 'Historial de Traducciones',
         actions: [
           if (_isSyncing)
-            const Padding(
-              padding: EdgeInsets.all(12),
+            Padding(
+              padding: const EdgeInsets.all(12),
               child: SizedBox(
                 width: 24,
                 height: 24,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
             )

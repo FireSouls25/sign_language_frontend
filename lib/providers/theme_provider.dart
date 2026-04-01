@@ -8,6 +8,9 @@ class ThemeProvider extends ChangeNotifier {
   Color _seedColor = Colors.deepPurple;
   Color get seedColor => _seedColor;
 
+  bool _showAppBarToggle = true;
+  bool get showAppBarToggle => _showAppBarToggle;
+
   ThemeProvider() {
     _loadTheme();
   }
@@ -19,6 +22,7 @@ class ThemeProvider extends ChangeNotifier {
     if (colorValue != null) {
       _seedColor = Color(colorValue);
     }
+    _showAppBarToggle = prefs.getBool('show_appbar_toggle') ?? true;
     notifyListeners();
   }
 
@@ -33,6 +37,13 @@ class ThemeProvider extends ChangeNotifier {
     _seedColor = color;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('seed_color', color.value);
+    notifyListeners();
+  }
+
+  Future<void> setShowAppBarToggle(bool value) async {
+    _showAppBarToggle = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('show_appbar_toggle', value);
     notifyListeners();
   }
 }

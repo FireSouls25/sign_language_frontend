@@ -9,6 +9,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
 import '../services/translation_websocket_service.dart';
 import '../services/error_translator.dart';
+import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 import 'login_screen.dart';
 import 'history_screen.dart';
@@ -296,7 +297,10 @@ class _HomeScreenState extends State<HomeScreen> {
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.deepPurple, width: 2),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primary,
+              width: 2,
+            ),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(10),
@@ -310,7 +314,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: FloatingActionButton.small(
               heroTag: 'switch_camera',
               onPressed: _switchCamera,
-              backgroundColor: Colors.deepPurple.withOpacity(0.8),
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.primary.withOpacity(0.8),
               child: const Icon(Icons.flip_camera_ios, color: Colors.white),
             ),
           ),
@@ -323,7 +329,7 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
+        color: AppTheme.getSurfaceColor(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -344,8 +350,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     : _currentTranslation,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: _currentTranslation.isEmpty
-                      ? Colors.grey
-                      : Colors.deepPurple,
+                      ? AppTheme.getTextSecondary(context)
+                      : Theme.of(context).colorScheme.primary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -359,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 label: const Text('Reconectar Servidor'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
                 ),
               ),
             ),
@@ -377,7 +383,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 IconButton(
                   icon: const Icon(Icons.volume_up),
                   onPressed: () => _speak(_currentTranslation),
-                  color: Colors.deepPurple,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ],
             ),
@@ -390,7 +396,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTranslateButton() {
     return FloatingActionButton.extended(
       onPressed: _isTranslating ? _stopTranslation : _startTranslation,
-      backgroundColor: _isTranslating ? Colors.red : Colors.deepPurple,
+      backgroundColor: _isTranslating
+          ? Colors.red
+          : Theme.of(context).colorScheme.primary,
       icon: Icon(_isTranslating ? Icons.stop : Icons.translate),
       label: Text(_isTranslating ? 'Detener' : 'Traducir'),
     );

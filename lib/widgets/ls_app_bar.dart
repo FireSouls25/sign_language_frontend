@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/theme_provider.dart';
 
 class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -8,6 +10,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool? isConnecting;
   final Widget? leading;
   final bool automaticallyImplyLeading;
+  final bool showThemeToggle;
 
   const LSAppBar({
     super.key,
@@ -18,6 +21,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.isConnecting,
     this.leading,
     this.automaticallyImplyLeading = true,
+    this.showThemeToggle = true,
   });
 
   @override
@@ -27,6 +31,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final themeProvider = context.watch<ThemeProvider>();
 
     Widget? titleWidget;
     if (showConnectionIndicator && isConnected != null) {
@@ -49,15 +54,38 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
       );
     }
 
+    List<Widget>? allActions = actions != null
+        ? List<Widget>.from(actions!)
+        : null;
+
+    if (themeProvider.showAppBarToggle) {
+      final toggleButton = IconButton(
+        icon: Icon(
+          isDark ? Icons.light_mode : Icons.dark_mode,
+          color: Colors.white,
+        ),
+        tooltip: isDark ? 'Modo Claro' : 'Modo Oscuro',
+        onPressed: () {
+          themeProvider.toggleTheme(!isDark);
+        },
+      );
+
+      if (allActions == null) {
+        allActions = [toggleButton];
+      } else {
+        allActions!.insert(0, toggleButton);
+      }
+    }
+
     return AppBar(
       title: titleWidget ?? Text(title),
       leading: leading,
       automaticallyImplyLeading: automaticallyImplyLeading,
       centerTitle: true,
       elevation: 0,
-      backgroundColor: isDark ? null : Colors.deepPurple,
-      foregroundColor: Colors.white,
-      actions: actions,
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: theme.colorScheme.onPrimary,
+      actions: allActions,
     );
   }
 }
