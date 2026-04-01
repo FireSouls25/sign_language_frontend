@@ -5,6 +5,7 @@ class Translation {
   final String? audioUrl;
   final double confidenceScore;
   final DateTime createdAt;
+  bool isFavorite;
 
   Translation({
     required this.id,
@@ -13,6 +14,7 @@ class Translation {
     this.audioUrl,
     required this.confidenceScore,
     required this.createdAt,
+    this.isFavorite = false,
   });
 
   factory Translation.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Translation {
       audioUrl: json['audio_url'] as String?,
       confidenceScore: (json['confidence_score'] as num).toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
+      isFavorite: json['is_favorite'] == 1 || json['is_favorite'] == true,
     );
   }
 
@@ -34,6 +37,7 @@ class Translation {
       audioUrl: map['audio_url'] as String?,
       confidenceScore: (map['confidence_score'] as num).toDouble(),
       createdAt: DateTime.parse(map['created_at'] as String),
+      isFavorite: map['is_favorite'] == 1 || map['is_favorite'] == true,
     );
   }
 
@@ -45,6 +49,7 @@ class Translation {
       'audio_url': audioUrl,
       'confidence_score': confidenceScore,
       'created_at': createdAt.toIso8601String(),
+      'is_favorite': isFavorite ? 1 : 0,
     };
   }
 
