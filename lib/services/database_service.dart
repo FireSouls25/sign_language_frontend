@@ -1,12 +1,15 @@
-import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+import '../models/log.dart';
+import '../models/translation.dart';
 
 class DatabaseService {
+  static final DatabaseService _instance = DatabaseService._internal();
   static Database? _database;
-  static const String _dbName = 'lsc_translator.db';
-  static const int _dbVersion = 1;
 
-  static const String tableTranslations = 'translations';
+  factory DatabaseService() => _instance;
+
+  DatabaseService._internal();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -15,96 +18,115 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
-
+    String path = join(await getDatabasesPath(), 'app_data.db');
     return await openDatabase(
       path,
-      version: _dbVersion,
-      onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
+      version: 2,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE logs(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message TEXT,
+            technical_details TEXT,
+            timestamp TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE offline_translations(
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            text_result TEXT,
+            audio_url TEXT,
+            confidence_score REAL,
+            created_at TEXT,
+            is_favorite INTEGER DEFAULT 0
+          )
+        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE offline_translations ADD COLUMN is_favorite INTEGER DEFAULT 0',
+          );
+        }
+      },
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE $tableTranslations (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        text_result TEXT NOT NULL,
-        audio_url TEXT,
-        confidence_score REAL NOT NULL,
-        created_at TEXT NOT NULL,
-        synced INTEGER DEFAULT 1
-      )
-    ''');
-
-    await db.execute('''
-      CREATE INDEX idx_translations_created_at 
-      ON $tableTranslations (created_at DESC)
-    ''');
-
-    await db.execute('''
-      CREATE INDEX idx_translations_user_id 
-      ON $tableTranslations (user_id)
-    ''');
+  // Logs (Errores Técnicos)
+  Future<void> insertLog(Log log) async {
+    final db = await database;
+    await db.insert('logs', log.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {}
-
-  Future<int> insertTranslation(Map<String, dynamic> data) async {
+  Future<List<Log>> getLogs() async {
     final db = await database;
-    return await db.insert(
-      tableTranslations,
-      data,
-      conflictAlgorithm: ConflictAlgorithm.replace,
+    final List<Map<String, dynamic>> maps = await db.query('logs', orderBy: 'timestamp DESC');
+    return List.generate(maps.length, (i) => Log.fromMap(maps[i]));
+  }
+
+  Future<void> clearLogs() async {
+    final db = await database;
+    await db.delete('logs');
+  }
+
+  // Traducciones (Modo Offline)
+  Future<void> saveTranslations(List<Translation> translations) async {
+    final db = await database;
+    final batch = db.batch();
+    for (var t in translations) {
+      // Usamos ON CONFLICT para actualizar los datos del servidor sin perder el favorito local
+      batch.execute('''
+        INSERT INTO offline_translations (id, user_id, text_result, audio_url, confidence_score, created_at, is_favorite)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          user_id = excluded.user_id,
+          text_result = excluded.text_result,
+          audio_url = excluded.audio_url,
+          confidence_score = excluded.confidence_score,
+          created_at = excluded.created_at
+      ''', [
+        t.id,
+        t.userId,
+        t.textResult,
+        t.audioUrl,
+        t.confidenceScore,
+        t.createdAt.toIso8601String(),
+        t.isFavorite ? 1 : 0,
+      ]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> toggleFavorite(String id, bool isFavorite) async {
+    final db = await database;
+    await db.update(
+      'offline_translations',
+      {'is_favorite': isFavorite ? 1 : 0},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 
-  Future<List<Map<String, dynamic>>> getTranslations({
-    int limit = 50,
-    int offset = 0,
-  }) async {
+  Future<List<Translation>> getFavorites(String userId) async {
     final db = await database;
-    return await db.query(
-      tableTranslations,
+    final List<Map<String, dynamic>> maps = await db.query(
+      'offline_translations',
+      where: 'user_id = ? AND is_favorite = 1',
+      whereArgs: [userId],
       orderBy: 'created_at DESC',
-      limit: limit,
-      offset: offset,
     );
+    return List.generate(maps.length, (i) => Translation.fromJson(maps[i]));
   }
 
-  Future<int> deleteTranslation(String id) async {
+  Future<List<Translation>> getOfflineTranslations(String userId) async {
     final db = await database;
-    return await db.delete(tableTranslations, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<int> deleteAllTranslations() async {
-    final db = await database;
-    return await db.delete(tableTranslations);
-  }
-
-  Future<int> getTranslationCount() async {
-    final db = await database;
-    final result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM $tableTranslations',
+    final List<Map<String, dynamic>> maps = await db.query(
+      'offline_translations',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+      orderBy: 'created_at DESC'
     );
-    return Sqflite.firstIntValue(result) ?? 0;
-  }
-
-  Future<List<Map<String, dynamic>>> searchTranslations(String query) async {
-    final db = await database;
-    return await db.query(
-      tableTranslations,
-      where: 'text_result LIKE ?',
-      whereArgs: ['%$query%'],
-      orderBy: 'created_at DESC',
-    );
-  }
-
-  Future<void> close() async {
-    final db = await database;
-    await db.close();
-    _database = null;
+    return List.generate(maps.length, (i) => Translation.fromJson(maps[i]));
   }
 }
