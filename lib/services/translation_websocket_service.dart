@@ -63,15 +63,29 @@ class TranslationWebSocketService {
 
   void _onMessage(dynamic message) {
     try {
+      if (kDebugMode) {
+        debugPrint('[WebSocket] Raw message received: $message');
+      }
+
       final data = jsonDecode(message as String) as Map<String, dynamic>;
       final type = data['type'] as String;
+
+      if (kDebugMode) {
+        debugPrint('[WebSocket] Message type: $type, data: $data');
+      }
 
       switch (type) {
         case 'translation':
           final result = TranslationResult.fromJson(data);
+          if (kDebugMode) {
+            debugPrint(
+              '[WebSocket] Translation result: text="${result.text}", confidence=${result.confidence}',
+            );
+          }
           _translationController.add(result);
           break;
         case 'error':
+          debugPrint('[WebSocket] Error received: ${data['message']}');
           _errorController.add({
             'message': data['message'] as String,
             'code': data['code'] as String?,
@@ -79,6 +93,7 @@ class TranslationWebSocketService {
           break;
       }
     } catch (e) {
+      debugPrint('[WebSocket] Failed to parse message: $e');
       _errorController.add({
         'message': 'Failed to parse message',
         'code': 'PARSE_ERROR',
@@ -130,8 +145,12 @@ class TranslationWebSocketService {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
       _channel!.sink.add(message);
+
+      debugPrint(
+        '[WebSocket] Landmarks sent: left=${landmarks['left_hand']?.length ?? 0} points, right=${landmarks['right_hand']?.length ?? 0} points',
+      );
     } catch (e) {
-      debugPrint('Error sending landmarks: $e');
+      debugPrint('[WebSocket] Error sending landmarks: $e');
     }
   }
 
