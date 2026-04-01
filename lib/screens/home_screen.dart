@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
 import '../services/translation_websocket_service.dart';
+import '../services/error_translator.dart';
 import '../widgets/ls_app_bar.dart';
 import 'login_screen.dart';
 import 'history_screen.dart';
@@ -113,6 +115,13 @@ class _HomeScreenState extends State<HomeScreen> {
       _translationSubscription = _wsService.translationStream.listen((result) {
         if (!mounted) return;
         final text = result.text;
+
+        if (result.confidence >= 0.8 &&
+            text.isNotEmpty &&
+            text != _currentTranslation) {
+          HapticFeedback.lightImpact();
+        }
+
         setState(() {
           _currentTranslation = text;
           _confidence = result.confidence;
@@ -124,23 +133,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _errorSubscription = _wsService.errorStream.listen((error) {
         if (!mounted) return;
+        final translatedMessage = ErrorTranslator.translate(
+          error['message'] ?? 'Error desconocido',
+        );
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error['message'])));
+        ).showSnackBar(SnackBar(content: Text(translatedMessage)));
       });
 
       _connectionSubscription = _wsService.connectionStream.listen((connected) {
         if (!mounted) return;
-        if (!connected && _isTranslating) {
-          _frameTimer?.cancel();
-          setState(() => _isTranslating = false);
-        }
+        setState(() {
+          _isTranslating = connected;
+        });
       });
     } catch (e) {
       if (mounted) {
+        final translatedMessage = ErrorTranslator.translate(e);
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error de conexión: $e')));
+        ).showSnackBar(SnackBar(content: Text(translatedMessage)));
       }
     }
   }
