@@ -30,6 +30,13 @@ class TranslationWebSocketService {
   bool get isConnected => _isConnected;
 
   bool _isDisconnecting = false;
+  String? _lastToken;
+  Timer? _pingTimer;
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
+  static const Duration _pingInterval = Duration(seconds: 20);
+  static const Duration _reconnectDelay = Duration(seconds: 3);
 
   Future<void> connect({String? token}) async {
     if (_isDisconnecting) {
@@ -53,6 +60,7 @@ class TranslationWebSocketService {
 
     await disconnect();
 
+    _lastToken = token;
     final wsUrl = token != null
         ? ApiConfig.buildWsUrlWithToken(token)
         : ApiConfig.wsUrl;
@@ -85,16 +93,75 @@ class TranslationWebSocketService {
 
       _isConnected = true;
       _isConnecting = false;
+      _reconnectAttempts = 0;
       _connectionController.add(true);
       debugPrint('[WebSocket] Connected successfully');
+
+      _startPingTimer();
     } catch (e) {
       debugPrint('[WebSocket] Connection error: $e');
       _isConnected = false;
       _isConnecting = false;
       _connectionController.add(false);
       _channel = null;
+      _scheduleReconnect();
       rethrow;
     }
+  }
+
+  void _startPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(_pingInterval, (_) {
+      _sendPing();
+    });
+    debugPrint(
+      '[WebSocket] Ping timer started, interval: ${_pingInterval.inSeconds}s',
+    );
+  }
+
+  void _stopPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+    debugPrint('[WebSocket] Ping timer stopped');
+  }
+
+  void _sendPing() {
+    if (_channel == null || !_isConnected) {
+      debugPrint('[WebSocket] Cannot send ping: not connected');
+      return;
+    }
+
+    try {
+      _channel!.sink.add(jsonEncode({'type': 'ping'}));
+      debugPrint('[WebSocket] Ping sent');
+    } catch (e) {
+      debugPrint('[WebSocket] Error sending ping: $e');
+    }
+  }
+
+  void _scheduleReconnect() {
+    if (_isDisconnecting || _reconnectAttempts >= _maxReconnectAttempts) {
+      debugPrint(
+        '[WebSocket] Not scheduling reconnect: disconnecting or max attempts reached',
+      );
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(_reconnectDelay, () {
+      if (!_isConnected && !_isConnecting && _lastToken != null) {
+        _reconnectAttempts++;
+        debugPrint(
+          '[WebSocket] Attempting reconnect $_reconnectAttempts/$_maxReconnectAttempts',
+        );
+        connect(token: _lastToken);
+      }
+    });
+  }
+
+  void _cancelReconnectTimer() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
   }
 
   void _onMessage(dynamic message) {
@@ -141,13 +208,25 @@ class TranslationWebSocketService {
   }
 
   void _onError(dynamic error) {
+    debugPrint('[WebSocket] _onError called: $error');
     _isConnected = false;
     _isConnecting = false;
-    _connectionController.add(false);
+
+    try {
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+    } catch (e) {
+      debugPrint('[WebSocket] Error in _onError: $e');
+    }
+
     _errorController.add({
       'message': 'Error de conexión: Verifica tu internet o el servidor',
       'code': 'CONNECTION_ERROR',
     });
+
+    _stopPingTimer();
+    _scheduleReconnect();
   }
 
   void _onDone() {
@@ -162,6 +241,7 @@ class TranslationWebSocketService {
 
     _isConnected = false;
     _isConnecting = false;
+    _stopPingTimer();
 
     try {
       if (!_connectionController.isClosed) {
@@ -170,6 +250,8 @@ class TranslationWebSocketService {
     } catch (e) {
       debugPrint('[WebSocket] Error in onDone: $e');
     }
+
+    _scheduleReconnect();
   }
 
   void sendLandmarks(Map<String, List<List<double>>> landmarks) {
@@ -217,6 +299,8 @@ class TranslationWebSocketService {
 
   Future<void> disconnect() async {
     _isDisconnecting = true;
+    _cancelReconnectTimer();
+    _stopPingTimer();
     debugPrint('[WebSocket] Starting intentional disconnect');
 
     if (_channel != null) {
@@ -232,6 +316,7 @@ class TranslationWebSocketService {
     _channel = null;
     _isConnected = false;
     _isConnecting = false;
+    _reconnectAttempts = 0;
 
     try {
       if (!_connectionController.isClosed) {
