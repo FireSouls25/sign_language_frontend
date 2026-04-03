@@ -149,6 +149,12 @@ class TranslationWebSocketService {
 
     _reconnectTimer?.cancel();
     _reconnectTimer = Timer(_reconnectDelay, () {
+      if (_isDisconnecting) {
+        debugPrint(
+          '[WebSocket] Skipping reconnect - intentionally disconnecting',
+        );
+        return;
+      }
       if (!_isConnected && !_isConnecting && _lastToken != null) {
         _reconnectAttempts++;
         debugPrint(
@@ -209,8 +215,20 @@ class TranslationWebSocketService {
 
   void _onError(dynamic error) {
     debugPrint('[WebSocket] _onError called: $error');
+
+    if (_isDisconnecting) {
+      debugPrint('[WebSocket] Ignoring onError - intentional disconnect');
+      return;
+    }
+
     _isConnected = false;
     _isConnecting = false;
+
+    if (_subscription != null) {
+      _subscription!.cancel();
+      _subscription = null;
+      debugPrint('[WebSocket] Subscription cancelled in _onError');
+    }
 
     try {
       if (!_connectionController.isClosed) {
@@ -226,7 +244,10 @@ class TranslationWebSocketService {
     });
 
     _stopPingTimer();
-    _scheduleReconnect();
+
+    if (!_isDisconnecting) {
+      _scheduleReconnect();
+    }
   }
 
   void _onDone() {
@@ -243,6 +264,12 @@ class TranslationWebSocketService {
     _isConnecting = false;
     _stopPingTimer();
 
+    if (_subscription != null) {
+      _subscription!.cancel();
+      _subscription = null;
+      debugPrint('[WebSocket] Subscription cancelled in _onDone');
+    }
+
     try {
       if (!_connectionController.isClosed) {
         _connectionController.add(false);
@@ -251,7 +278,9 @@ class TranslationWebSocketService {
       debugPrint('[WebSocket] Error in onDone: $e');
     }
 
-    _scheduleReconnect();
+    if (!_isDisconnecting) {
+      _scheduleReconnect();
+    }
   }
 
   void sendLandmarks(Map<String, List<List<double>>> landmarks) {
