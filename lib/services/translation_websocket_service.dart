@@ -29,10 +29,26 @@ class TranslationWebSocketService {
   bool _isConnected = false;
   bool get isConnected => _isConnected;
 
+  bool _isDisconnecting = false;
+
   Future<void> connect({String? token}) async {
+    if (_isDisconnecting) {
+      debugPrint('[WebSocket] Currently disconnecting, waiting...');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
     if (_isConnected && _channel != null) {
       debugPrint('[WebSocket] Already connected');
       return;
+    }
+
+    if (_isConnecting) {
+      debugPrint('[WebSocket] Already connecting, waiting...');
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (_isConnected) {
+        debugPrint('[WebSocket] Connection completed while waiting');
+        return;
+      }
     }
 
     await disconnect();
@@ -135,9 +151,25 @@ class TranslationWebSocketService {
   }
 
   void _onDone() {
+    debugPrint(
+      '[WebSocket] _onDone called, _isDisconnecting: $_isDisconnecting',
+    );
+
+    if (_isDisconnecting) {
+      debugPrint('[WebSocket] Ignoring onDone - intentional disconnect');
+      return;
+    }
+
     _isConnected = false;
     _isConnecting = false;
-    _connectionController.add(false);
+
+    try {
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+    } catch (e) {
+      debugPrint('[WebSocket] Error in onDone: $e');
+    }
   }
 
   void sendLandmarks(Map<String, List<List<double>>> landmarks) {
@@ -184,6 +216,9 @@ class TranslationWebSocketService {
   }
 
   Future<void> disconnect() async {
+    _isDisconnecting = true;
+    debugPrint('[WebSocket] Starting intentional disconnect');
+
     if (_channel != null) {
       try {
         await _subscription?.cancel();
@@ -205,6 +240,9 @@ class TranslationWebSocketService {
     } catch (e) {
       debugPrint('[WebSocket] Error notifying disconnect: $e');
     }
+
+    _isDisconnecting = false;
+    debugPrint('[WebSocket] Disconnect completed');
   }
 
   void dispose() {
