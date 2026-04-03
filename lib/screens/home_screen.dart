@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'package:hand_landmarker/hand_landmarker.dart';
+import 'package:hand_detection/hand_detection.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
@@ -28,10 +28,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
   final FlutterTts _flutterTts = FlutterTts();
 
-  HandLandmarkerPlugin? _handLandmarker;
+  HandDetector? _handDetector;
   int _frameCounter = 0;
   static const int _framesToProcess = 5;
-  bool _isHandLandmarkerInitialized = false;
+  bool _isHandDetectorInitialized = false;
 
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
@@ -47,24 +47,24 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _isVoiceEnabled = context.read<AuthProvider>().isVoiceEnabled;
-    _initializeHandLandmarker();
+    _initializeHandDetector();
     _initializeCamera();
     _initializeWebSocket();
     _initializeTts();
   }
 
-  Future<void> _initializeHandLandmarker() async {
+  Future<void> _initializeHandDetector() async {
     try {
-      _handLandmarker = HandLandmarkerPlugin.create(
-        numHands: 2,
-        minHandDetectionConfidence: 0.5,
-        delegate: HandLandmarkerDelegate.gpu,
+      _handDetector = HandDetector(
+        mode: HandMode.boxesAndLandmarks,
+        landmarkModel: HandLandmarkModel.full,
       );
-      _isHandLandmarkerInitialized = true;
-      debugPrint('HandLandmarker initialized successfully');
+      await _handDetector!.initialize();
+      _isHandDetectorInitialized = true;
+      debugPrint('[HomeScreen] HandDetector initialized successfully');
     } catch (e) {
-      debugPrint('Error initializing HandLandmarker: $e');
-      _isHandLandmarkerInitialized = false;
+      debugPrint('[HomeScreen] Error initializing HandDetector: $e');
+      _isHandDetectorInitialized = false;
     }
   }
 
@@ -212,12 +212,12 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('[HomeScreen] Frame #$_frameCounter received');
 
         if (_frameCounter >= _framesToProcess &&
-            _isHandLandmarkerInitialized &&
-            _handLandmarker != null) {
+            _isHandDetectorInitialized &&
+            _handDetector != null) {
           _frameCounter = 0;
 
           debugPrint('[HomeScreen] Processing frame for landmarks...');
-          final landmarks = _processImageForLandmarks(image);
+          final landmarks = await _processImageForLandmarks(image);
 
           debugPrint(
             '[HomeScreen] Landmarks result: left=${landmarks['left_hand']?.length ?? 0}, right=${landmarks['right_hand']?.length ?? 0}',
@@ -238,36 +238,38 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Map<String, List<List<double>>> _processImageForLandmarks(CameraImage image) {
+  Future<Map<String, List<List<double>>>> _processImageForLandmarks(
+    CameraImage image,
+  ) async {
     Map<String, List<List<double>>> landmarks = {};
 
-    if (_handLandmarker == null || !_isHandLandmarkerInitialized) {
-      debugPrint('[HomeScreen] HandLandmarker not initialized');
+    if (_handDetector == null || !_isHandDetectorInitialized) {
+      debugPrint('[HomeScreen] HandDetector not initialized');
       return landmarks;
     }
 
     try {
-      final result = _handLandmarker!.detect(
-        image,
-        _cameraController!.description.sensorOrientation,
-      );
+      final Uint8List bytes = image.planes.first.bytes;
+      final List<Hand> hands = await _handDetector!.detect(bytes);
 
-      if (result != null && result.isNotEmpty) {
-        debugPrint('[HomeScreen] Detected ${result.length} hand(s)');
-        for (int i = 0; i < result.length; i++) {
-          final hand = result[i];
-          final handLandmarks = hand.landmarks
-              .map((point) => [point.x, point.y, point.z])
-              .toList();
+      if (hands.isNotEmpty) {
+        debugPrint('[HomeScreen] Detected ${hands.length} hand(s)');
+        for (int i = 0; i < hands.length; i++) {
+          final hand = hands[i];
+          if (hand.hasLandmarks) {
+            final handLandmarks = hand.landmarks
+                .map((point) => [point.x, point.y, point.z])
+                .toList();
 
-          debugPrint(
-            '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks',
-          );
+            debugPrint(
+              '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks, handedness: ${hand.handedness?.name ?? "unknown"}',
+            );
 
-          if (i == 0) {
-            landmarks['left_hand'] = handLandmarks;
-          } else if (i == 1) {
-            landmarks['right_hand'] = handLandmarks;
+            if (hand.handedness == Handedness.left) {
+              landmarks['left_hand'] = handLandmarks;
+            } else if (hand.handedness == Handedness.right) {
+              landmarks['right_hand'] = handLandmarks;
+            }
           }
         }
       } else {
@@ -331,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _wsService.dispose();
     _flutterTts.stop();
     _cameraController?.dispose();
-    _handLandmarker?.dispose();
+    _handDetector?.dispose();
     super.dispose();
   }
 
