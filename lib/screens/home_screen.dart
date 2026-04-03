@@ -249,8 +249,8 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      final Uint8List bytes = image.planes.first.bytes;
-      final List<Hand> hands = await _handDetector!.detect(bytes);
+      final Uint8List imageBytes = image.planes.first.bytes;
+      final List<Hand> hands = await _handDetector!.detect(imageBytes);
 
       if (hands.isNotEmpty) {
         debugPrint('[HomeScreen] Detected ${hands.length} hand(s)');
