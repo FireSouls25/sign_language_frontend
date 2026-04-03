@@ -134,12 +134,18 @@ class _HomeScreenState extends State<HomeScreen> {
       await _wsService.connect(token: authProvider.accessToken);
 
       _translationSubscription = _wsService.translationStream.listen((result) {
+        debugPrint(
+          '[HomeScreen] Received translation result: text="${result.text}", confidence=${result.confidence}',
+        );
         if (!mounted) return;
         final text = result.text;
 
         if (result.confidence >= 0.8 &&
             text.isNotEmpty &&
             text != _currentTranslation) {
+          debugPrint(
+            '[HomeScreen] High confidence translation detected, triggering haptic',
+          );
           HapticFeedback.lightImpact();
         }
 
@@ -147,6 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
           _currentTranslation = text;
           _confidence = result.confidence;
         });
+        debugPrint('[HomeScreen] Updated UI with translation: $text');
         if (_isVoiceEnabled && text.isNotEmpty) {
           _speak(text);
         }
@@ -179,10 +186,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _startTranslation() {
+    debugPrint('[HomeScreen] _startTranslation called');
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      debugPrint('[HomeScreen] Camera not initialized, returning');
       return;
     }
 
+    debugPrint('[HomeScreen] Camera initialized, starting image stream');
     _frameCounter = 0;
 
     setState(() {
@@ -193,26 +203,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _cameraController!.startImageStream((CameraImage image) async {
       if (!_wsService.isConnected || _cameraController == null) {
+        debugPrint('[HomeScreen] WebSocket not connected or camera null');
         return;
       }
 
       try {
         _frameCounter++;
+        debugPrint('[HomeScreen] Frame #$_frameCounter received');
 
         if (_frameCounter >= _framesToProcess &&
             _isHandLandmarkerInitialized &&
             _handLandmarker != null) {
           _frameCounter = 0;
 
+          debugPrint('[HomeScreen] Processing frame for landmarks...');
           final landmarks = _processImageForLandmarks(image);
+
+          debugPrint(
+            '[HomeScreen] Landmarks result: left=${landmarks['left_hand']?.length ?? 0}, right=${landmarks['right_hand']?.length ?? 0}',
+          );
 
           if (landmarks['left_hand'] != null ||
               landmarks['right_hand'] != null) {
+            debugPrint('[HomeScreen] Sending landmarks to WebSocket...');
             _wsService.sendLandmarks(landmarks);
+            debugPrint('[HomeScreen] Landmarks sent successfully');
+          } else {
+            debugPrint('[HomeScreen] No hands detected, skipping send');
           }
         }
       } catch (e) {
-        debugPrint('Error in frame processing: $e');
+        debugPrint('[HomeScreen] Error in frame processing: $e');
       }
     });
   }
@@ -455,6 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ],
+          const SizedBox(height: 80),
         ],
       ),
     );
