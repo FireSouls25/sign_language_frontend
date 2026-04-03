@@ -66,7 +66,9 @@ class TranslationWebSocketService {
         : ApiConfig.wsUrl;
 
     _isConnecting = true;
-    _connectionController.add(false);
+    if (!_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
 
     try {
       debugPrint('[WebSocket] Connecting to: $wsUrl');
@@ -94,7 +96,9 @@ class TranslationWebSocketService {
       _isConnected = true;
       _isConnecting = false;
       _reconnectAttempts = 0;
-      _connectionController.add(true);
+      if (!_connectionController.isClosed) {
+        _connectionController.add(true);
+      }
       debugPrint('[WebSocket] Connected successfully');
 
       _startPingTimer();
@@ -102,7 +106,9 @@ class TranslationWebSocketService {
       debugPrint('[WebSocket] Connection error: $e');
       _isConnected = false;
       _isConnecting = false;
-      _connectionController.add(false);
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
       _channel = null;
       _scheduleReconnect();
       rethrow;
@@ -155,7 +161,10 @@ class TranslationWebSocketService {
         );
         return;
       }
-      if (!_isConnected && !_isConnecting && _lastToken != null) {
+      if (!_isConnected &&
+          !_isConnecting &&
+          _lastToken != null &&
+          !_isDisconnecting) {
         _reconnectAttempts++;
         debugPrint(
           '[WebSocket] Attempting reconnect $_reconnectAttempts/$_maxReconnectAttempts',
