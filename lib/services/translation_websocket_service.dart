@@ -30,6 +30,11 @@ class TranslationWebSocketService {
   bool get isConnected => _isConnected;
 
   Future<void> connect({String? token}) async {
+    if (_isConnected && _channel != null) {
+      debugPrint('[WebSocket] Already connected');
+      return;
+    }
+
     await disconnect();
 
     final wsUrl = token != null
@@ -43,9 +48,12 @@ class TranslationWebSocketService {
       debugPrint('[WebSocket] Connecting to: $wsUrl');
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
+      await _channel!.ready;
+      debugPrint('[WebSocket] Channel ready');
+
       _subscription = _channel!.stream.listen(
         (message) {
-          debugPrint('[WebSocket] Connection established, receiving message');
+          debugPrint('[WebSocket] Received message');
           _onMessage(message);
         },
         onError: (error) {
@@ -59,7 +67,6 @@ class TranslationWebSocketService {
         cancelOnError: false,
       );
 
-      await Future.delayed(const Duration(milliseconds: 500));
       _isConnected = true;
       _isConnecting = false;
       _connectionController.add(true);
@@ -69,6 +76,7 @@ class TranslationWebSocketService {
       _isConnected = false;
       _isConnecting = false;
       _connectionController.add(false);
+      _channel = null;
       rethrow;
     }
   }
@@ -176,15 +184,27 @@ class TranslationWebSocketService {
   }
 
   Future<void> disconnect() async {
-    await _subscription?.cancel();
-    _subscription = null;
+    if (_channel != null) {
+      try {
+        await _subscription?.cancel();
+        _subscription = null;
 
-    await _channel?.sink.close();
+        await _channel!.sink.close();
+      } catch (e) {
+        debugPrint('[WebSocket] Error closing channel: $e');
+      }
+    }
     _channel = null;
-
     _isConnected = false;
     _isConnecting = false;
-    _connectionController.add(false);
+
+    try {
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+    } catch (e) {
+      debugPrint('[WebSocket] Error notifying disconnect: $e');
+    }
   }
 
   void dispose() {
