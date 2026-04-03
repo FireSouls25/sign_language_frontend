@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../config/api_config.dart';
@@ -115,22 +114,6 @@ class TranslationWebSocketService {
     _isConnected = false;
     _isConnecting = false;
     _connectionController.add(false);
-  }
-
-  void sendFrame(String base64Image) {
-    if (_channel == null || !_isConnected) {
-      throw Exception('WebSocket not connected');
-    }
-
-    _channel!.sink.add(jsonEncode({'type': 'frame', 'data': base64Image}));
-  }
-
-  void sendFrameBinary(Uint8List imageBytes) {
-    if (_channel == null || !_isConnected) {
-      return;
-    }
-
-    _channel!.sink.add(imageBytes);
   }
 
   void sendLandmarks(Map<String, List<List<double>>> landmarks) {

@@ -1,7 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
@@ -214,9 +211,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _wsService.sendLandmarks(landmarks);
           }
         }
-
-        final bytes = image.planes.first.bytes;
-        _wsService.sendFrameBinary(bytes);
       } catch (e) {
         debugPrint('Error in frame processing: $e');
       }
