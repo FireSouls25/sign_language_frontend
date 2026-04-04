@@ -36,7 +36,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final themeProvider = context.watch<ThemeProvider>();
-    final localeProvider = context.watch<LocaleProvider>();
+    context.watch<LocaleProvider>();
 
     Widget? titleWidget;
     if (showConnectionIndicator && isConnected != null) {
@@ -65,13 +65,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     if (showLanguageSelector) {
       final languageButton = IconButton(
-        icon: Text(
-          localeProvider.locale.languageCode.toUpperCase(),
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+        icon: Icon(Icons.translate, color: theme.colorScheme.onPrimary),
         tooltip: 'Cambiar idioma',
         onPressed: () {
           Navigator.of(context).push(

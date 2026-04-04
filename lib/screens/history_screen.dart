@@ -5,6 +5,7 @@ import '../models/translation.dart';
 import '../services/translation_repository.dart';
 import '../providers/auth_provider.dart';
 import '../services/error_translator.dart';
+import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 
@@ -86,11 +87,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } catch (e) {
       ErrorTranslator.translate(e);
       if (mounted) {
+        final l = (String key) => AppTranslations.text(context, key);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Error al sincronizar: ${ErrorTranslator.translate(e)}',
-            ),
+            content: Text(l('syncError') + ': ${ErrorTranslator.translate(e)}'),
           ),
         );
       }
@@ -109,14 +109,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
       await _audioPlayer.play();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Falló la reproducción del audio')),
-        );
+        final l = (String key) => AppTranslations.text(context, key);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l('audioPlaybackFailed'))));
       }
     }
   }
 
   Widget _buildBody() {
+    final l = (String key) => AppTranslations.text(context, key);
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -133,13 +136,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              _isOffline ? 'Sin conexión a internet' : 'Error al cargar',
+              _isOffline ? l('noInternetConnection') : l('errorLoadingData'),
               style: const TextStyle(fontSize: 18),
             ),
             if (_isOffline) ...[
               const SizedBox(height: 8),
               Text(
-                'Mostrando datos guardados localmente',
+                l('showingLocalData'),
                 style: TextStyle(color: AppTheme.getTextSecondary(context)),
               ),
             ],
@@ -149,7 +152,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ? _syncFromServer
                   : () => _loadHistory(forceRefresh: true),
               icon: Icon(_isOffline ? Icons.sync : Icons.refresh),
-              label: Text(_isOffline ? 'Sincronizar' : 'Reintentar'),
+              label: Text(_isOffline ? l('sync') : l('retry')),
             ),
           ],
         ),
@@ -168,7 +171,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Aún no hay historial de traducciones',
+              l('noHistoryYet'),
               style: TextStyle(
                 fontSize: 18,
                 color: AppTheme.getTextSecondary(context),
@@ -178,7 +181,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ElevatedButton.icon(
               onPressed: _syncFromServer,
               icon: const Icon(Icons.sync),
-              label: const Text('Sincronizar'),
+              label: Text(l('sync')),
             ),
           ],
         ),
@@ -223,9 +226,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
           _translations.removeWhere((t) => t.id == translation.id);
         });
         if (mounted) {
+          final l = (String key) => AppTranslations.text(context, key);
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Traducción eliminada')));
+          ).showSnackBar(SnackBar(content: Text(l('translationDeleted'))));
         }
       },
       child: Card(
@@ -301,15 +305,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   String _formatDate(DateTime date) {
+    final l = (String key) => AppTranslations.text(context, key);
     final now = DateTime.now();
     final difference = now.difference(date);
 
     if (difference.inDays == 0) {
-      return 'Hoy ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+      return l('today') +
+          ' ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
     } else if (difference.inDays == 1) {
-      return 'Ayer';
+      return l('yesterday');
     } else if (difference.inDays < 7) {
-      return 'Hace ${difference.inDays} días';
+      return l('daysAgo').replaceAll('{days}', difference.inDays.toString());
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
@@ -317,9 +323,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = (String key) => AppTranslations.text(context, key);
+
     return Scaffold(
       appBar: LSAppBar(
-        title: 'Historial de Traducciones',
+        title: l('historyTitle'),
         actions: [
           if (_isSyncing)
             Padding(
@@ -345,12 +353,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   }
                 });
               },
-              tooltip: _isSearching ? 'Cerrar' : 'Buscar',
+              tooltip: _isSearching ? l('closeSearch') : l('search'),
             ),
           IconButton(
             icon: const Icon(Icons.sync),
             onPressed: _syncFromServer,
-            tooltip: 'Sincronizar',
+            tooltip: l('sync'),
           ),
         ],
       ),

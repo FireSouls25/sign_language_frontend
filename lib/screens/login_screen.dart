@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final localeProvider = context.watch<LocaleProvider>();
+    context.watch<LocaleProvider>();
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
@@ -45,12 +45,9 @@ class _LoginScreenState extends State<LoginScreen> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: Text(
-              localeProvider.locale.languageCode.toUpperCase(),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            icon: Icon(
+              Icons.translate,
+              color: Theme.of(context).colorScheme.onPrimary,
             ),
             tooltip: l('selectLanguage'),
             onPressed: () {
