@@ -2,7 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'package:hand_landmarker/hand_landmarker.dart';
+import 'package:hand_detection/hand_detection.dart';
+import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
@@ -28,10 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
   final FlutterTts _flutterTts = FlutterTts();
 
-  HandLandmarkerPlugin? _handLandmarker;
+  HandDetector? _handDetector;
   int _frameCounter = 0;
   static const int _framesToProcess = 5;
-  bool _isHandLandmarkerInitialized = false;
+  bool _isHandDetectorInitialized = false;
 
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
@@ -47,24 +48,25 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _isVoiceEnabled = context.read<AuthProvider>().isVoiceEnabled;
-    _initializeHandLandmarker();
+    _initializeHandDetector();
     _initializeCamera();
     _initializeWebSocket();
     _initializeTts();
   }
 
-  Future<void> _initializeHandLandmarker() async {
+  Future<void> _initializeHandDetector() async {
     try {
-      _handLandmarker = HandLandmarkerPlugin.create(
-        numHands: 2,
-        minHandDetectionConfidence: 0.5,
-        delegate: HandLandmarkerDelegate.gpu,
+      _handDetector = HandDetector(
+        mode: HandMode.boxesAndLandmarks,
+        landmarkModel: HandLandmarkModel.full,
+        performanceConfig: const PerformanceConfig.xnnpack(),
       );
-      _isHandLandmarkerInitialized = true;
-      debugPrint('HandLandmarker initialized successfully');
+      await _handDetector!.initialize();
+      _isHandDetectorInitialized = true;
+      debugPrint('[HomeScreen] HandDetector initialized successfully');
     } catch (e) {
-      debugPrint('Error initializing HandLandmarker: $e');
-      _isHandLandmarkerInitialized = false;
+      debugPrint('[HomeScreen] Error initializing HandDetector: $e');
+      _isHandDetectorInitialized = false;
     }
   }
 
@@ -101,8 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _cameraController = CameraController(
       _cameras![cameraIndex],
-      ResolutionPreset.low,
-      imageFormatGroup: ImageFormatGroup.jpeg,
+      ResolutionPreset.high,
+      imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
     try {
@@ -134,21 +136,40 @@ class _HomeScreenState extends State<HomeScreen> {
       await _wsService.connect(token: authProvider.accessToken);
 
       _translationSubscription = _wsService.translationStream.listen((result) {
+        debugPrint(
+          '[HomeScreen] Received translation result: text="${result.text}", confidence=${result.confidence}, candidate="${result.candidate}", candidate_confidence=${result.candidateConfidence}',
+        );
         if (!mounted) return;
-        final text = result.text;
 
-        if (result.confidence >= 0.8 &&
-            text.isNotEmpty &&
-            text != _currentTranslation) {
+        String displayText = result.text;
+        double displayConfidence = result.confidence;
+
+        if (result.candidate.isNotEmpty && result.candidateConfidence >= 0.5) {
+          displayText = result.candidate;
+          displayConfidence = result.candidateConfidence;
+          debugPrint(
+            '[HomeScreen] Using candidate as translation: $displayText (confidence: ${displayConfidence.toStringAsFixed(2)})',
+          );
+        }
+
+        if (displayConfidence >= 0.5 &&
+            displayText.isNotEmpty &&
+            displayText != _currentTranslation) {
+          debugPrint(
+            '[HomeScreen] High confidence translation detected, triggering haptic',
+          );
           HapticFeedback.lightImpact();
         }
 
         setState(() {
-          _currentTranslation = text;
-          _confidence = result.confidence;
+          _currentTranslation = displayText;
+          _confidence = displayConfidence;
         });
-        if (_isVoiceEnabled && text.isNotEmpty) {
-          _speak(text);
+        debugPrint(
+          '[HomeScreen] Updated UI with translation: $displayText (confidence: ${displayConfidence.toStringAsFixed(2)})',
+        );
+        if (_isVoiceEnabled && displayText.isNotEmpty) {
+          _speak(displayText);
         }
       });
 
@@ -179,10 +200,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _startTranslation() {
+    debugPrint('[HomeScreen] _startTranslation called');
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      debugPrint('[HomeScreen] Camera not initialized, returning');
       return;
     }
 
+    debugPrint('[HomeScreen] Camera initialized, starting image stream');
     _frameCounter = 0;
 
     setState(() {
@@ -193,60 +217,82 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _cameraController!.startImageStream((CameraImage image) async {
       if (!_wsService.isConnected || _cameraController == null) {
+        debugPrint('[HomeScreen] WebSocket not connected or camera null');
         return;
       }
 
       try {
         _frameCounter++;
+        debugPrint('[HomeScreen] Frame #$_frameCounter received');
 
         if (_frameCounter >= _framesToProcess &&
-            _isHandLandmarkerInitialized &&
-            _handLandmarker != null) {
+            _isHandDetectorInitialized &&
+            _handDetector != null) {
           _frameCounter = 0;
 
-          final landmarks = _processImageForLandmarks(image);
+          debugPrint('[HomeScreen] Processing frame for landmarks...');
+          final landmarks = await _processImageForLandmarks(image);
+
+          debugPrint(
+            '[HomeScreen] Landmarks result: left=${landmarks['left_hand']?.length ?? 0}, right=${landmarks['right_hand']?.length ?? 0}',
+          );
 
           if (landmarks['left_hand'] != null ||
               landmarks['right_hand'] != null) {
+            debugPrint('[HomeScreen] Sending landmarks to WebSocket...');
             _wsService.sendLandmarks(landmarks);
+            debugPrint('[HomeScreen] Landmarks sent successfully');
+          } else {
+            debugPrint('[HomeScreen] No hands detected, skipping send');
           }
         }
       } catch (e) {
-        debugPrint('Error in frame processing: $e');
+        debugPrint('[HomeScreen] Error in frame processing: $e');
       }
     });
   }
 
-  Map<String, List<List<double>>> _processImageForLandmarks(CameraImage image) {
+  Future<Map<String, List<List<double>>>> _processImageForLandmarks(
+    CameraImage image,
+  ) async {
     Map<String, List<List<double>>> landmarks = {};
 
-    if (_handLandmarker == null || !_isHandLandmarkerInitialized) {
-      debugPrint('[HomeScreen] HandLandmarker not initialized');
+    if (_handDetector == null || !_isHandDetectorInitialized) {
+      debugPrint('[HomeScreen] HandDetector not initialized');
       return landmarks;
     }
 
     try {
-      final result = _handLandmarker!.detect(
-        image,
-        _cameraController!.description.sensorOrientation,
-      );
+      cv.Mat? mat = await _convertCameraImageToMat(image);
+      if (mat == null) {
+        debugPrint('[HomeScreen] Failed to convert camera image to Mat');
+        return landmarks;
+      }
 
-      if (result != null && result.isNotEmpty) {
-        debugPrint('[HomeScreen] Detected ${result.length} hand(s)');
-        for (int i = 0; i < result.length; i++) {
-          final hand = result[i];
-          final handLandmarks = hand.landmarks
-              .map((point) => [point.x, point.y, point.z])
-              .toList();
+      final int detectionWidth = mat.cols;
+      final int detectionHeight = mat.rows;
 
-          debugPrint(
-            '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks',
-          );
+      final List<Hand> hands = await _handDetector!.detectOnMat(mat);
+      mat.dispose();
 
-          if (i == 0) {
-            landmarks['left_hand'] = handLandmarks;
-          } else if (i == 1) {
-            landmarks['right_hand'] = handLandmarks;
+      if (hands.isNotEmpty) {
+        debugPrint('[HomeScreen] Detected ${hands.length} hand(s)');
+        for (int i = 0; i < hands.length; i++) {
+          final hand = hands[i];
+          if (hand.hasLandmarks) {
+            final handLandmarks = hand.landmarks
+                .map((point) => [point.x, point.y, point.z])
+                .toList();
+
+            debugPrint(
+              '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks, image size: ${detectionWidth}x${detectionHeight}',
+            );
+
+            if (hand.handedness == Handedness.left) {
+              landmarks['left_hand'] = handLandmarks;
+            } else if (hand.handedness == Handedness.right) {
+              landmarks['right_hand'] = handLandmarks;
+            }
           }
         }
       } else {
@@ -257,6 +303,92 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return landmarks;
+  }
+
+  Future<cv.Mat?> _convertCameraImageToMat(CameraImage image) async {
+    try {
+      final int width = image.width;
+      final int height = image.height;
+
+      if (image.planes.length == 1 &&
+          (image.planes[0].bytesPerPixel ?? 1) >= 4) {
+        final bytes = image.planes[0].bytes;
+        final stride = image.planes[0].bytesPerRow;
+        final matCols = stride ~/ 4;
+        final bgraOrRgba = cv.Mat.fromList(
+          height,
+          matCols,
+          cv.MatType.CV_8UC4,
+          bytes,
+        );
+        final cropped = matCols != width
+            ? bgraOrRgba.region(cv.Rect(0, 0, width, height))
+            : bgraOrRgba;
+        final bgr = cv.cvtColor(cropped, cv.COLOR_BGRA2BGR);
+        if (!identical(cropped, bgraOrRgba)) cropped.dispose();
+        bgraOrRgba.dispose();
+        return bgr;
+      }
+
+      final bgrBytes = Uint8List(width * height * 3);
+      final int yRowStride = image.planes[0].bytesPerRow;
+      final int yPixelStride = image.planes[0].bytesPerPixel ?? 1;
+
+      void writePixel(int x, int y, int yp, int up, int vp) {
+        int r = (yp + vp * 1436 / 1024 - 179).round().clamp(0, 255);
+        int g = (yp - up * 46549 / 131072 + 44 - vp * 93604 / 131072 + 91)
+            .round()
+            .clamp(0, 255);
+        int b = (yp + up * 1814 / 1024 - 227).round().clamp(0, 255);
+        final int bgrIdx = (y * width + x) * 3;
+        bgrBytes[bgrIdx] = b;
+        bgrBytes[bgrIdx + 1] = g;
+        bgrBytes[bgrIdx + 2] = r;
+      }
+
+      if (image.planes.length == 2) {
+        final int uvRowStride = image.planes[1].bytesPerRow;
+        final int uvPixelStride = image.planes[1].bytesPerPixel ?? 2;
+        for (int y = 0; y < height; y++) {
+          for (int x = 0; x < width; x++) {
+            final int uvIndex =
+                uvPixelStride * (x ~/ 2) + uvRowStride * (y ~/ 2);
+            final int index = y * yRowStride + x * yPixelStride;
+            writePixel(
+              x,
+              y,
+              image.planes[0].bytes[index],
+              image.planes[1].bytes[uvIndex],
+              image.planes[1].bytes[uvIndex + 1],
+            );
+          }
+        }
+      } else if (image.planes.length >= 3) {
+        final int uvRowStride = image.planes[1].bytesPerRow;
+        final int uvPixelStride = image.planes[1].bytesPerPixel ?? 1;
+        for (int y = 0; y < height; y++) {
+          for (int x = 0; x < width; x++) {
+            final int uvIndex =
+                uvPixelStride * (x ~/ 2) + uvRowStride * (y ~/ 2);
+            final int index = y * yRowStride + x * yPixelStride;
+            writePixel(
+              x,
+              y,
+              image.planes[0].bytes[index],
+              image.planes[1].bytes[uvIndex],
+              image.planes[2].bytes[uvIndex],
+            );
+          }
+        }
+      } else {
+        return null;
+      }
+
+      return cv.Mat.fromList(height, width, cv.MatType.CV_8UC3, bgrBytes);
+    } catch (e) {
+      debugPrint('[HomeScreen] Error converting CameraImage to Mat: $e');
+      return null;
+    }
   }
 
   void _stopTranslation() {
@@ -310,7 +442,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _wsService.dispose();
     _flutterTts.stop();
     _cameraController?.dispose();
-    _handLandmarker?.dispose();
+    _handDetector?.dispose();
     super.dispose();
   }
 
@@ -322,6 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
         showConnectionIndicator: true,
         isConnected: _wsService.isConnected,
         isConnecting: _wsService.isConnecting,
+        showLanguageSelector: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -339,7 +472,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
             },
           ),
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
         ],
       ),
       body: Column(
@@ -455,6 +587,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ],
+          const SizedBox(height: 80),
         ],
       ),
     );

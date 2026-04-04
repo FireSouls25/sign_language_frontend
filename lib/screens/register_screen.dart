@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/locale_provider.dart';
 import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 import 'home_screen.dart';
+import 'language_select_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -52,8 +54,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final localeProvider = context.watch<LocaleProvider>();
+
     return Scaffold(
-      appBar: const LSAppBar(title: 'Crear Cuenta'),
+      appBar: LSAppBar(
+        title: 'Crear Cuenta',
+        showLanguageSelector: true,
+        automaticallyImplyLeading: true,
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/locale_provider.dart';
+import '../screens/language_select_screen.dart';
 
 class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -11,6 +13,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget? leading;
   final bool automaticallyImplyLeading;
   final bool showThemeToggle;
+  final bool showLanguageSelector;
 
   const LSAppBar({
     super.key,
@@ -22,6 +25,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.leading,
     this.automaticallyImplyLeading = true,
     this.showThemeToggle = true,
+    this.showLanguageSelector = false,
   });
 
   @override
@@ -32,6 +36,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final themeProvider = context.watch<ThemeProvider>();
+    final localeProvider = context.watch<LocaleProvider>();
 
     Widget? titleWidget;
     if (showConnectionIndicator && isConnected != null) {
@@ -57,6 +62,30 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     List<Widget>? allActions = actions != null
         ? List<Widget>.from(actions!)
         : null;
+
+    if (showLanguageSelector) {
+      final languageButton = IconButton(
+        icon: Text(
+          localeProvider.locale.languageCode.toUpperCase(),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        tooltip: 'Cambiar idioma',
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const LanguageSelectScreen()),
+          );
+        },
+      );
+
+      if (allActions == null) {
+        allActions = [languageButton];
+      } else {
+        allActions.insert(0, languageButton);
+      }
+    }
 
     if (themeProvider.showAppBarToggle) {
       final toggleButton = IconButton(
