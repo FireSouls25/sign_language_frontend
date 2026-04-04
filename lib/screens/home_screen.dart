@@ -137,14 +137,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _translationSubscription = _wsService.translationStream.listen((result) {
         debugPrint(
-          '[HomeScreen] Received translation result: text="${result.text}", confidence=${result.confidence}',
+          '[HomeScreen] Received translation result: text="${result.text}", confidence=${result.confidence}, candidate="${result.candidate}", candidate_confidence=${result.candidateConfidence}',
         );
         if (!mounted) return;
-        final text = result.text;
 
-        if (result.confidence >= 0.8 &&
-            text.isNotEmpty &&
-            text != _currentTranslation) {
+        String displayText = result.text;
+        double displayConfidence = result.confidence;
+
+        if (result.candidate.isNotEmpty && result.candidateConfidence >= 0.5) {
+          displayText = result.candidate;
+          displayConfidence = result.candidateConfidence;
+          debugPrint(
+            '[HomeScreen] Using candidate as translation: $displayText (confidence: ${displayConfidence.toStringAsFixed(2)})',
+          );
+        }
+
+        if (displayConfidence >= 0.5 &&
+            displayText.isNotEmpty &&
+            displayText != _currentTranslation) {
           debugPrint(
             '[HomeScreen] High confidence translation detected, triggering haptic',
           );
@@ -152,12 +162,14 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         setState(() {
-          _currentTranslation = text;
-          _confidence = result.confidence;
+          _currentTranslation = displayText;
+          _confidence = displayConfidence;
         });
-        debugPrint('[HomeScreen] Updated UI with translation: $text');
-        if (_isVoiceEnabled && text.isNotEmpty) {
-          _speak(text);
+        debugPrint(
+          '[HomeScreen] Updated UI with translation: $displayText (confidence: ${displayConfidence.toStringAsFixed(2)})',
+        );
+        if (_isVoiceEnabled && displayText.isNotEmpty) {
+          _speak(displayText);
         }
       });
 
