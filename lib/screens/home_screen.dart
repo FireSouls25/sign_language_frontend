@@ -7,6 +7,7 @@ import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
+import '../l10n/app_translations.dart';
 import '../services/translation_websocket_service.dart';
 import '../services/error_translator.dart';
 import '../config/theme_config.dart';
@@ -448,9 +449,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = (String key) => AppTranslations.text(context, key);
+
     return Scaffold(
       appBar: LSAppBar(
-        title: 'Traductor LSC',
+        title: l('translation'),
         showConnectionIndicator: true,
         isConnected: _wsService.isConnected,
         isConnecting: _wsService.isConnecting,
@@ -477,10 +480,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           Expanded(flex: 3, child: _buildCameraPreview()),
-          Expanded(flex: 2, child: _buildTranslationResult()),
+          Expanded(flex: 2, child: _buildTranslationResult(l)),
         ],
       ),
-      floatingActionButton: _buildTranslateButton(),
+      floatingActionButton: _buildTranslateButton(l),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
@@ -523,7 +526,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTranslationResult() {
+  Widget _buildTranslationResult(String Function(String) l) {
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
@@ -535,7 +538,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Traducción',
+            l('translation'),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -545,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Center(
               child: Text(
                 _currentTranslation.isEmpty
-                    ? 'Presiona el botón para empezar a traducir'
+                    ? l('startTranslating')
                     : _currentTranslation,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: _currentTranslation.isEmpty
@@ -561,7 +564,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ElevatedButton.icon(
                 onPressed: _initializeWebSocket,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Reconectar Servidor'),
+                label: Text(l('reconnectServer')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -574,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Precisión: ${(_confidence * 100).toStringAsFixed(1)}%',
+                  '${l('confidence')}: ${(_confidence * 100).toStringAsFixed(1)}%',
                   style: TextStyle(
                     color: _confidence >= 0.7 ? Colors.green : Colors.orange,
                   ),
@@ -593,14 +596,14 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTranslateButton() {
+  Widget _buildTranslateButton(String Function(String) l) {
     return FloatingActionButton.extended(
       onPressed: _isTranslating ? _stopTranslation : _startTranslation,
       backgroundColor: _isTranslating
           ? Colors.red
           : Theme.of(context).colorScheme.primary,
       icon: Icon(_isTranslating ? Icons.stop : Icons.translate),
-      label: Text(_isTranslating ? 'Detener' : 'Traducir'),
+      label: Text(_isTranslating ? l('stopTranslating') : l('translateWord')),
     );
   }
 }
