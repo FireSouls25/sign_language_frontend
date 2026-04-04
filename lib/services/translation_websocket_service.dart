@@ -34,9 +34,10 @@ class TranslationWebSocketService {
   Timer? _pingTimer;
   Timer? _reconnectTimer;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 5;
-  static const Duration _pingInterval = Duration(seconds: 20);
-  static const Duration _reconnectDelay = Duration(seconds: 3);
+  static const int _maxReconnectAttempts = 10;
+  static const Duration _pingInterval = Duration(seconds: 15);
+  static const Duration _initialPingDelay = Duration(seconds: 5);
+  static const Duration _reconnectDelay = Duration(seconds: 2);
 
   Future<void> connect({String? token}) async {
     if (_isDisconnecting) {
@@ -66,7 +67,9 @@ class TranslationWebSocketService {
         : ApiConfig.wsUrl;
 
     _isConnecting = true;
-    _connectionController.add(false);
+    if (!_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
 
     try {
       debugPrint('[WebSocket] Connecting to: $wsUrl');
@@ -94,7 +97,9 @@ class TranslationWebSocketService {
       _isConnected = true;
       _isConnecting = false;
       _reconnectAttempts = 0;
-      _connectionController.add(true);
+      if (!_connectionController.isClosed) {
+        _connectionController.add(true);
+      }
       debugPrint('[WebSocket] Connected successfully');
 
       _startPingTimer();
@@ -102,7 +107,9 @@ class TranslationWebSocketService {
       debugPrint('[WebSocket] Connection error: $e');
       _isConnected = false;
       _isConnecting = false;
-      _connectionController.add(false);
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
       _channel = null;
       _scheduleReconnect();
       rethrow;
@@ -117,6 +124,13 @@ class TranslationWebSocketService {
     debugPrint(
       '[WebSocket] Ping timer started, interval: ${_pingInterval.inSeconds}s',
     );
+
+    Future.delayed(_initialPingDelay, () {
+      if (_isConnected && !_isDisconnecting) {
+        debugPrint('[WebSocket] Sending initial ping to verify connection...');
+        _sendPing();
+      }
+    });
   }
 
   void _stopPingTimer() {
@@ -148,8 +162,28 @@ class TranslationWebSocketService {
     }
 
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(_reconnectDelay, () {
-      if (!_isConnected && !_isConnecting && _lastToken != null) {
+
+    final int attempt = _reconnectAttempts + 1;
+    final int delaySeconds =
+        (_reconnectDelay.inSeconds * (1 << _reconnectAttempts.clamp(0, 5)))
+            .clamp(2, 30);
+    final Duration delay = Duration(seconds: delaySeconds);
+
+    debugPrint(
+      '[WebSocket] Scheduling reconnect attempt $attempt in ${delay.inSeconds}s (backoff)',
+    );
+
+    _reconnectTimer = Timer(delay, () {
+      if (_isDisconnecting) {
+        debugPrint(
+          '[WebSocket] Skipping reconnect - intentionally disconnecting',
+        );
+        return;
+      }
+      if (!_isConnected &&
+          !_isConnecting &&
+          _lastToken != null &&
+          !_isDisconnecting) {
         _reconnectAttempts++;
         debugPrint(
           '[WebSocket] Attempting reconnect $_reconnectAttempts/$_maxReconnectAttempts',
@@ -209,8 +243,20 @@ class TranslationWebSocketService {
 
   void _onError(dynamic error) {
     debugPrint('[WebSocket] _onError called: $error');
+
+    if (_isDisconnecting) {
+      debugPrint('[WebSocket] Ignoring onError - intentional disconnect');
+      return;
+    }
+
     _isConnected = false;
     _isConnecting = false;
+
+    if (_subscription != null) {
+      _subscription!.cancel();
+      _subscription = null;
+      debugPrint('[WebSocket] Subscription cancelled in _onError');
+    }
 
     try {
       if (!_connectionController.isClosed) {
@@ -226,7 +272,10 @@ class TranslationWebSocketService {
     });
 
     _stopPingTimer();
-    _scheduleReconnect();
+
+    if (!_isDisconnecting) {
+      _scheduleReconnect();
+    }
   }
 
   void _onDone() {
@@ -243,6 +292,12 @@ class TranslationWebSocketService {
     _isConnecting = false;
     _stopPingTimer();
 
+    if (_subscription != null) {
+      _subscription!.cancel();
+      _subscription = null;
+      debugPrint('[WebSocket] Subscription cancelled in _onDone');
+    }
+
     try {
       if (!_connectionController.isClosed) {
         _connectionController.add(false);
@@ -251,7 +306,9 @@ class TranslationWebSocketService {
       debugPrint('[WebSocket] Error in onDone: $e');
     }
 
-    _scheduleReconnect();
+    if (!_isDisconnecting) {
+      _scheduleReconnect();
+    }
   }
 
   void sendLandmarks(Map<String, List<List<double>>> landmarks) {
@@ -259,15 +316,11 @@ class TranslationWebSocketService {
       '[WebSocket] sendLandmarks called, isConnected: $_isConnected, channel exists: ${_channel != null}',
     );
 
-    if (_channel == null) {
-      debugPrint('[WebSocket] Cannot send landmarks: channel is null');
-      return;
-    }
-
-    if (!_isConnected) {
+    if (_channel == null || !_isConnected) {
       debugPrint(
-        '[WebSocket] Cannot send landmarks: not connected (isConnecting: $_isConnecting)',
+        '[WebSocket] Not connected or channel null, scheduling reconnect...',
       );
+      _scheduleReconnect();
       return;
     }
 
