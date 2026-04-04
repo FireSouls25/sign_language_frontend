@@ -29,58 +29,191 @@ class TranslationWebSocketService {
   bool _isConnected = false;
   bool get isConnected => _isConnected;
 
+  bool _isDisconnecting = false;
+  String? _lastToken;
+  Timer? _pingTimer;
+  Timer? _reconnectTimer;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 10;
+  static const Duration _pingInterval = Duration(seconds: 15);
+  static const Duration _initialPingDelay = Duration(seconds: 5);
+  static const Duration _reconnectDelay = Duration(seconds: 2);
+
   Future<void> connect({String? token}) async {
+    if (_isDisconnecting) {
+      debugPrint('[WebSocket] Currently disconnecting, waiting...');
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (_isConnected && _channel != null) {
+      debugPrint('[WebSocket] Already connected');
+      return;
+    }
+
+    if (_isConnecting) {
+      debugPrint('[WebSocket] Already connecting, waiting...');
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (_isConnected) {
+        debugPrint('[WebSocket] Connection completed while waiting');
+        return;
+      }
+    }
+
     await disconnect();
 
+    _lastToken = token;
     final wsUrl = token != null
         ? ApiConfig.buildWsUrlWithToken(token)
         : ApiConfig.wsUrl;
 
     _isConnecting = true;
-    _connectionController.add(false);
+    if (!_connectionController.isClosed) {
+      _connectionController.add(false);
+    }
 
     try {
+      debugPrint('[WebSocket] Connecting to: $wsUrl');
       _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
+      await _channel!.ready;
+      debugPrint('[WebSocket] Channel ready');
+
       _subscription = _channel!.stream.listen(
-        _onMessage,
-        onError: _onError,
-        onDone: _onDone,
+        (message) {
+          debugPrint('[WebSocket] Received message');
+          _onMessage(message);
+        },
+        onError: (error) {
+          debugPrint('[WebSocket] Stream error: $error');
+          _onError(error);
+        },
+        onDone: () {
+          debugPrint('[WebSocket] Stream done/closed');
+          _onDone();
+        },
         cancelOnError: false,
       );
 
       _isConnected = true;
       _isConnecting = false;
-      _connectionController.add(true);
+      _reconnectAttempts = 0;
+      if (!_connectionController.isClosed) {
+        _connectionController.add(true);
+      }
+      debugPrint('[WebSocket] Connected successfully');
+
+      _startPingTimer();
     } catch (e) {
+      debugPrint('[WebSocket] Connection error: $e');
       _isConnected = false;
       _isConnecting = false;
-      _connectionController.add(false);
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+      _channel = null;
+      _scheduleReconnect();
       rethrow;
     }
   }
 
-  void _onMessage(dynamic message) {
-    try {
-      if (kDebugMode) {
-        debugPrint('[WebSocket] Raw message received: $message');
-      }
+  void _startPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(_pingInterval, (_) {
+      _sendPing();
+    });
+    debugPrint(
+      '[WebSocket] Ping timer started, interval: ${_pingInterval.inSeconds}s',
+    );
 
+    Future.delayed(_initialPingDelay, () {
+      if (_isConnected && !_isDisconnecting) {
+        debugPrint('[WebSocket] Sending initial ping to verify connection...');
+        _sendPing();
+      }
+    });
+  }
+
+  void _stopPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+    debugPrint('[WebSocket] Ping timer stopped');
+  }
+
+  void _sendPing() {
+    if (_channel == null || !_isConnected) {
+      debugPrint('[WebSocket] Cannot send ping: not connected');
+      return;
+    }
+
+    try {
+      _channel!.sink.add(jsonEncode({'type': 'ping'}));
+      debugPrint('[WebSocket] Ping sent');
+    } catch (e) {
+      debugPrint('[WebSocket] Error sending ping: $e');
+    }
+  }
+
+  void _scheduleReconnect() {
+    if (_isDisconnecting || _reconnectAttempts >= _maxReconnectAttempts) {
+      debugPrint(
+        '[WebSocket] Not scheduling reconnect: disconnecting or max attempts reached',
+      );
+      return;
+    }
+
+    _reconnectTimer?.cancel();
+
+    final int attempt = _reconnectAttempts + 1;
+    final int delaySeconds =
+        (_reconnectDelay.inSeconds * (1 << _reconnectAttempts.clamp(0, 5)))
+            .clamp(2, 30);
+    final Duration delay = Duration(seconds: delaySeconds);
+
+    debugPrint(
+      '[WebSocket] Scheduling reconnect attempt $attempt in ${delay.inSeconds}s (backoff)',
+    );
+
+    _reconnectTimer = Timer(delay, () {
+      if (_isDisconnecting) {
+        debugPrint(
+          '[WebSocket] Skipping reconnect - intentionally disconnecting',
+        );
+        return;
+      }
+      if (!_isConnected &&
+          !_isConnecting &&
+          _lastToken != null &&
+          !_isDisconnecting) {
+        _reconnectAttempts++;
+        debugPrint(
+          '[WebSocket] Attempting reconnect $_reconnectAttempts/$_maxReconnectAttempts',
+        );
+        connect(token: _lastToken);
+      }
+    });
+  }
+
+  void _cancelReconnectTimer() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
+  void _onMessage(dynamic message) {
+    debugPrint('[WebSocket] Raw message received: $message');
+
+    try {
       final data = jsonDecode(message as String) as Map<String, dynamic>;
       final type = data['type'] as String;
 
-      if (kDebugMode) {
-        debugPrint('[WebSocket] Message type: $type, data: $data');
-      }
+      debugPrint('[WebSocket] Message type: $type, data: $data');
 
       switch (type) {
         case 'translation':
+          debugPrint('[WebSocket] Parsing translation response...');
           final result = TranslationResult.fromJson(data);
-          if (kDebugMode) {
-            debugPrint(
-              '[WebSocket] Translation result: text="${result.text}", confidence=${result.confidence}',
-            );
-          }
+          debugPrint(
+            '[WebSocket] Translation result: text="${result.text}", confidence=${result.confidence}',
+          );
           _translationController.add(result);
           break;
         case 'error':
@@ -90,6 +223,14 @@ class TranslationWebSocketService {
             'code': data['code'] as String?,
           });
           break;
+        case 'pong':
+          debugPrint('[WebSocket] Pong received');
+          break;
+        case 'reset':
+          debugPrint('[WebSocket] Reset acknowledged');
+          break;
+        default:
+          debugPrint('[WebSocket] Unknown message type: $type');
       }
     } catch (e) {
       debugPrint('[WebSocket] Failed to parse message: $e');
@@ -101,23 +242,85 @@ class TranslationWebSocketService {
   }
 
   void _onError(dynamic error) {
+    debugPrint('[WebSocket] _onError called: $error');
+
+    if (_isDisconnecting) {
+      debugPrint('[WebSocket] Ignoring onError - intentional disconnect');
+      return;
+    }
+
     _isConnected = false;
     _isConnecting = false;
-    _connectionController.add(false);
+
+    if (_subscription != null) {
+      _subscription!.cancel();
+      _subscription = null;
+      debugPrint('[WebSocket] Subscription cancelled in _onError');
+    }
+
+    try {
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+    } catch (e) {
+      debugPrint('[WebSocket] Error in _onError: $e');
+    }
+
     _errorController.add({
       'message': 'Error de conexión: Verifica tu internet o el servidor',
       'code': 'CONNECTION_ERROR',
     });
+
+    _stopPingTimer();
+
+    if (!_isDisconnecting) {
+      _scheduleReconnect();
+    }
   }
 
   void _onDone() {
+    debugPrint(
+      '[WebSocket] _onDone called, _isDisconnecting: $_isDisconnecting',
+    );
+
+    if (_isDisconnecting) {
+      debugPrint('[WebSocket] Ignoring onDone - intentional disconnect');
+      return;
+    }
+
     _isConnected = false;
     _isConnecting = false;
-    _connectionController.add(false);
+    _stopPingTimer();
+
+    if (_subscription != null) {
+      _subscription!.cancel();
+      _subscription = null;
+      debugPrint('[WebSocket] Subscription cancelled in _onDone');
+    }
+
+    try {
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+    } catch (e) {
+      debugPrint('[WebSocket] Error in onDone: $e');
+    }
+
+    if (!_isDisconnecting) {
+      _scheduleReconnect();
+    }
   }
 
   void sendLandmarks(Map<String, List<List<double>>> landmarks) {
+    debugPrint(
+      '[WebSocket] sendLandmarks called, isConnected: $_isConnected, channel exists: ${_channel != null}',
+    );
+
     if (_channel == null || !_isConnected) {
+      debugPrint(
+        '[WebSocket] Not connected or channel null, scheduling reconnect...',
+      );
+      _scheduleReconnect();
       return;
     }
 
@@ -127,10 +330,12 @@ class TranslationWebSocketService {
         'data': landmarks,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
-      _channel!.sink.add(message);
-
       debugPrint(
-        '[WebSocket] Landmarks sent: left=${landmarks['left_hand']?.length ?? 0} points, right=${landmarks['right_hand']?.length ?? 0} points',
+        '[WebSocket] Sending landmarks message (${message.length} chars)...',
+      );
+      _channel!.sink.add(message);
+      debugPrint(
+        '[WebSocket] Landmarks sent successfully: left=${landmarks['left_hand']?.length ?? 0} points, right=${landmarks['right_hand']?.length ?? 0} points',
       );
     } catch (e) {
       debugPrint('[WebSocket] Error sending landmarks: $e');
@@ -146,15 +351,36 @@ class TranslationWebSocketService {
   }
 
   Future<void> disconnect() async {
-    await _subscription?.cancel();
-    _subscription = null;
+    _isDisconnecting = true;
+    _cancelReconnectTimer();
+    _stopPingTimer();
+    debugPrint('[WebSocket] Starting intentional disconnect');
 
-    await _channel?.sink.close();
+    if (_channel != null) {
+      try {
+        await _subscription?.cancel();
+        _subscription = null;
+
+        await _channel!.sink.close();
+      } catch (e) {
+        debugPrint('[WebSocket] Error closing channel: $e');
+      }
+    }
     _channel = null;
-
     _isConnected = false;
     _isConnecting = false;
-    _connectionController.add(false);
+    _reconnectAttempts = 0;
+
+    try {
+      if (!_connectionController.isClosed) {
+        _connectionController.add(false);
+      }
+    } catch (e) {
+      debugPrint('[WebSocket] Error notifying disconnect: $e');
+    }
+
+    _isDisconnecting = false;
+    debugPrint('[WebSocket] Disconnect completed');
   }
 
   void dispose() {
