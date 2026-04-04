@@ -5,6 +5,7 @@ import '../models/translation.dart';
 import '../providers/auth_provider.dart';
 import '../services/database_service.dart';
 import '../services/error_translator.dart';
+import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -57,9 +58,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     } catch (e) {
       ErrorTranslator.translate(e);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Falló la reproducción del audio')),
-        );
+        final l = (String key) => AppTranslations.text(context, key);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l('audioPlaybackFailed'))));
       }
     }
   }
@@ -72,17 +74,19 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = (String key) => AppTranslations.text(context, key);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mis Favoritos'),
+        title: Text(l('favorites')),
         backgroundColor: Colors.redAccent,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
-      body: _buildBody(),
+      body: _buildBody(l),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(String Function(String) l) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -99,7 +103,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Aún no tienes traducciones favoritas',
+              l('noFavoritesYet'),
               style: TextStyle(
                 fontSize: 18,
                 color: AppTheme.getTextSecondary(context),

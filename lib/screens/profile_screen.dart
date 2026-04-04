@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
 import 'logs_screen.dart';
 
@@ -17,10 +18,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final user = authProvider.user;
+    final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mi Perfil'),
+        title: Text(l('myProfile')),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ),
@@ -56,13 +58,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(color: AppTheme.getTextSecondary(context)),
                   ),
                   const SizedBox(height: 32),
-                  _buildSectionTitle('Información Personal'),
-                  _buildInfoTile(Icons.email, 'Correo Electrónico', user.email),
+                  _buildSectionTitle(l('personalInfo')),
+                  _buildInfoTile(Icons.email, l('email'), user.email),
                   const SizedBox(height: 24),
-                  _buildSectionTitle('Ajustes de la Aplicación'),
+                  _buildSectionTitle(l('appSettings')),
                   SwitchListTile(
-                    title: const Text('Modo Oscuro'),
-                    subtitle: const Text('Cambiar el aspecto de la aplicación'),
+                    title: Text(l('darkMode')),
+                    subtitle: Text(l('changeTheme')),
                     value: context.watch<ThemeProvider>().isDarkMode,
                     activeColor: Theme.of(context).colorScheme.primary,
                     onChanged: (bool value) {
@@ -72,10 +74,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   SwitchListTile(
-                    title: const Text('Botón de tema en AppBar'),
-                    subtitle: const Text(
-                      'Mostrar botón para cambiar modo en barra superior',
-                    ),
+                    title: Text(l('themeButtonInAppBar')),
+                    subtitle: Text(l('themeButtonInAppBarDesc')),
                     value: context.watch<ThemeProvider>().showAppBarToggle,
                     activeColor: Theme.of(context).colorScheme.primary,
                     onChanged: (bool value) {
@@ -87,11 +87,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Color de Acento',
-                      style: TextStyle(
+                      l('accentColor'),
+                      style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
@@ -103,18 +103,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _buildColorOption(context, Colors.deepPurple, 'Morado'),
-                        _buildColorOption(context, Colors.blue, 'Azul'),
-                        _buildColorOption(context, Colors.teal, 'Verde'),
+                        _buildColorOption(
+                          context,
+                          Colors.deepPurple,
+                          l('purple'),
+                        ),
+                        _buildColorOption(context, Colors.blue, l('blue')),
+                        _buildColorOption(context, Colors.teal, l('green')),
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
                   SwitchListTile(
-                    title: const Text('Reproducción de Voz (TTS)'),
-                    subtitle: const Text(
-                      'Escuchar la traducción automáticamente',
-                    ),
+                    title: Text(l('voiceOutput')),
+                    subtitle: Text(l('voiceOutputDesc')),
                     value: authProvider.isVoiceEnabled,
                     activeColor: Theme.of(context).colorScheme.primary,
                     onChanged: (bool value) {
@@ -128,8 +130,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Icons.bug_report,
                       color: AppTheme.getIconPrimary(context),
                     ),
-                    title: const Text('Logs del Sistema'),
-                    subtitle: const Text('Ver errores técnicos'),
+                    title: Text(l('systemLogs')),
+                    subtitle: Text(l('systemLogsDesc')),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.push(
                       context,
@@ -137,12 +139,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  _buildSectionTitle('Seguridad'),
+                  _buildSectionTitle(l('security')),
                   ListTile(
                     leading: const Icon(Icons.lock_outline),
-                    title: const Text('Cambiar Contraseña'),
+                    title: Text(l('changePassword')),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showChangePasswordDialog(),
+                    onTap: () => _showChangePasswordDialog(l),
                   ),
                   const SizedBox(height: 40),
                   SizedBox(
@@ -157,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         }
                       },
                       icon: const Icon(Icons.logout),
-                      label: const Text('Cerrar Sesión'),
+                      label: Text(l('logout')),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
                         side: const BorderSide(color: Colors.red),
@@ -206,7 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showChangePasswordDialog() {
+  void _showChangePasswordDialog(String Function(String) l) {
     final currentController = TextEditingController();
     final newController = TextEditingController();
     final confirmController = TextEditingController();
@@ -218,7 +220,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('Cambiar Contraseña'),
+            title: Text(l('changePassword')),
             content: Form(
               key: formKey,
               child: Column(
@@ -227,13 +229,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   TextFormField(
                     controller: currentController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Contraseña Actual',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l('currentPassword'),
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa tu contraseña actual';
+                        return l('enterCurrentPassword');
                       }
                       return null;
                     },
@@ -242,16 +244,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   TextFormField(
                     controller: newController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Nueva Contraseña',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l('newPassword'),
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa una nueva contraseña';
+                        return l('enterNewPassword');
                       }
                       if (value.length < 6) {
-                        return 'La contraseña debe tener al menos 6 caracteres';
+                        return l('passwordMinLength');
                       }
                       return null;
                     },
@@ -260,13 +262,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   TextFormField(
                     controller: confirmController,
                     obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Confirmar Nueva Contraseña',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l('confirmNewPassword'),
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value != newController.text) {
-                        return 'Las contraseñas no coinciden';
+                        return l('passwordsDoNotMatch');
                       }
                       return null;
                     },
@@ -279,7 +281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: isLoading
                     ? null
                     : () => Navigator.pop(dialogContext),
-                child: const Text('Cancelar'),
+                child: Text(l('cancel')),
               ),
               ElevatedButton(
                 onPressed: isLoading
@@ -303,19 +305,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (success) {
                           Navigator.pop(dialogContext);
                           ScaffoldMessenger.of(this.context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Contraseña actualizada exitosamente',
-                              ),
+                            SnackBar(
+                              content: Text(l('passwordUpdatedSuccess')),
                               backgroundColor: Colors.green,
                             ),
                           );
                         } else {
                           ScaffoldMessenger.of(this.context).showSnackBar(
                             SnackBar(
-                              content: Text(
-                                error ?? 'Error al cambiar contraseña',
-                              ),
+                              content: Text(error ?? l('passwordUpdateError')),
                               backgroundColor: Colors.red,
                             ),
                           );
@@ -327,7 +325,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Actualizar'),
+                    : Text(l('update')),
               ),
             ],
           );

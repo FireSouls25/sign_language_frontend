@@ -2,11 +2,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/locale_provider.dart';
+import '../l10n/app_translations.dart';
 import '../services/google_auth_service.dart';
 import '../services/deep_link_service.dart';
 import '../config/theme_config.dart';
 import 'register_screen.dart';
 import 'home_screen.dart';
+import 'language_select_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,7 +34,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<LocaleProvider>();
+    final l = (String key) => AppTranslations.text(context, key);
+
     return Scaffold(
+      appBar: AppBar(
+        title: Text(l('appTitle')),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.translate,
+              color: Theme.of(context).colorScheme.onPrimary,
+            ),
+            tooltip: l('selectLanguage'),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LanguageSelectScreen()),
+              );
+            },
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -49,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Traductor LSC',
+                    l('appTitle'),
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: Theme.of(context).colorScheme.primary,
@@ -58,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Traductor de Lengua de Señas Colombiana',
+                    l('colombianSignLanguage'),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: AppTheme.getTextSecondary(context),
                     ),
@@ -67,14 +93,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 48),
                   TextFormField(
                     controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Usuario',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person),
+                    decoration: InputDecoration(
+                      labelText: l('user'),
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.person),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa tu usuario';
+                        return l('pleaseEnterUser');
                       }
                       return null;
                     },
@@ -84,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     decoration: InputDecoration(
-                      labelText: 'Contraseña',
+                      labelText: l('password'),
                       border: const OutlineInputBorder(),
                       prefixIcon: const Icon(Icons.lock),
                       suffixIcon: IconButton(
@@ -102,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa tu contraseña';
+                        return l('pleaseEnterPassword');
                       }
                       return null;
                     },
@@ -147,29 +173,29 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ).colorScheme.onPrimary,
                                 ),
                               )
-                            : const Text(
-                                'Iniciar Sesión',
-                                style: TextStyle(fontSize: 16),
+                            : Text(
+                                l('loginButton'),
+                                style: const TextStyle(fontSize: 16),
                               ),
                       );
                     },
                   ),
                   const SizedBox(height: 24),
-                  const Row(
+                  Row(
                     children: [
-                      Expanded(child: Divider()),
+                      const Expanded(child: Divider()),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: Text('O'),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(l('or')),
                       ),
-                      Expanded(child: Divider()),
+                      const Expanded(child: Divider()),
                     ],
                   ),
                   const SizedBox(height: 24),
                   OutlinedButton.icon(
                     onPressed: _loginWithGoogle,
                     icon: const Icon(Icons.g_mobiledata, size: 24),
-                    label: const Text('Continuar con Google'),
+                    label: Text(l('continueWithGoogle')),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
@@ -183,7 +209,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       );
                     },
-                    child: const Text("¿No tienes cuenta? Regístrate"),
+                    child: Text(l('dontHaveAccount') + ' ' + l('registerNow')),
                   ),
                 ],
               ),

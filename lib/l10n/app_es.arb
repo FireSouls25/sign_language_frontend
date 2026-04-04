@@ -1,0 +1,187 @@
+{
+  "@@locale": "es",
+  "appTitle": "Traductor LSC",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  "login": "Iniciar sesión",
+  "@login": {
+    "description": "Login button text"
+  },
+  "register": "Registrarse",
+  "@register": {
+    "description": "Register button text"
+  },
+  "email": "Correo electrónico",
+  "@email": {
+    "description": "Email field label"
+  },
+  "password": "Contraseña",
+  "@password": {
+    "description": "Password field label"
+  },
+  "confirmPassword": "Confirmar contraseña",
+  "@confirmPassword": {
+    "description": "Confirm password field label"
+  },
+  "name": "Nombre",
+  "@name": {
+    "description": "Name field label"
+  },
+  "logout": "Cerrar sesión",
+  "@logout": {
+    "description": "Logout button text"
+  },
+  "profile": "Perfil",
+  "@profile": {
+    "description": "Profile screen title"
+  },
+  "history": "Historial",
+  "@history": {
+    "description": "History screen title"
+  },
+  "translation": "Traducción",
+  "@translation": {
+    "description": "Translation label"
+  },
+  "startTranslating": "Presiona el botón para empezar a traducir",
+  "@startTranslating": {
+    "description": "Prompt to start translation"
+  },
+  "stopTranslating": "Detener",
+  "@stopTranslating": {
+    "description": "Stop translation button"
+  },
+  "translate": "Traducir",
+  "@translate": {
+    "description": "Translate button text"
+  },
+  "confidence": "Precisión",
+  "@confidence": {
+    "description": "Confidence label"
+  },
+  "reconnectServer": "Reconectar Servidor",
+  "@reconnectServer": {
+    "description": "Reconnect server button"
+  },
+  "selectLanguage": "Seleccionar idioma",
+  "@selectLanguage": {
+    "description": "Language selection screen title"
+  },
+  "spanish": "Español",
+  "@spanish": {
+    "description": "Spanish language name"
+  },
+  "english": "Inglés",
+  "@english": {
+    "description": "English language name"
+  },
+  "settings": "Configuración",
+  "@settings": {
+    "description": "Settings label"
+  },
+  "voiceEnabled": "Voz activada",
+  "@voiceEnabled": {
+    "description": "Voice enabled setting"
+  },
+  "darkMode": "Modo oscuro",
+  "@darkMode": {
+    "description": "Dark mode setting"
+  },
+  "noHistory": "Sin historial",
+  "@noHistory": {
+    "description": "Empty history message"
+  },
+  "error": "Error",
+  "@error": {
+    "description": "Error label"
+  },
+  "success": "Éxito",
+  "@success": {
+    "description": "Success label"
+  },
+  "loading": "Cargando...",
+  "@loading": {
+    "description": "Loading text"
+  },
+  "save": "Guardar",
+  "@save": {
+    "description": "Save button text"
+  },
+  "cancel": "Cancelar",
+  "@cancel": {
+    "description": "Cancel button text"
+  },
+  "delete": "Eliminar",
+  "@delete": {
+    "description": "Delete button text"
+  },
+  "edit": "Editar",
+  "@edit": {
+    "description": "Edit button text"
+  },
+  "back": "Volver",
+  "@back": {
+    "description": "Back button text"
+  },
+  "next": "Siguiente",
+  "@next": {
+    "description": "Next button text"
+  },
+  "previous": "Anterior",
+  "@previous": {
+    "description": "Previous button text"
+  },
+  "welcome": "Bienvenido",
+  "@welcome": {
+    "description": "Welcome message"
+  },
+  "dontHaveAccount": "¿No tienes cuenta?",
+  "@dontHaveAccount": {
+    "description": "Dont have account text"
+  },
+  "alreadyHaveAccount": "¿Ya tienes cuenta?",
+  "@alreadyHaveAccount": {
+    "description": "Already have account text"
+  },
+  "invalidEmail": "Correo electrónico inválido",
+  "@invalidEmail": {
+    "description": "Invalid email error"
+  },
+  "invalidPassword": "Contraseña muy corta",
+  "@invalidPassword": {
+    "description": "Invalid password error"
+  },
+  "passwordsDoNotMatch": "Las contraseñas no coinciden",
+  "@passwordsDoNotMatch": {
+    "description": "Passwords do not match error"
+  },
+  "connectionError": "Error de conexión",
+  "@connectionError": {
+    "description": "Connection error message"
+  },
+  "unknownError": "Error desconocido",
+  "@unknownError": {
+    "description": "Unknown error message"
+  },
+  "noInternet": "Sin conexión a internet",
+  "@noInternet": {
+    "description": "No internet message"
+  },
+  "serverError": "Error del servidor",
+  "@serverError": {
+    "description": "Server error message"
+  },
+  "tryAgain": "Intentar de nuevo",
+  "@tryAgain": {
+    "description": "Try again button"
+  },
+  "sessionExpired": "Sesión expirada",
+  "@sessionExpired": {
+    "description": "Session expired message"
+  },
+  "loginRequired": "Debes iniciar sesión",
+  "@loginRequired": {
+    "description": "Login required message"
+  }
+}
