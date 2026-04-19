@@ -311,7 +311,10 @@ class TranslationWebSocketService {
     }
   }
 
-  void sendLandmarks(Map<String, List<List<double>>> landmarks) {
+  void sendLandmarks(
+    Map<String, List<List<double>>> landmarks, {
+    String mode = 'handshape',
+  }) {
     debugPrint(
       '[WebSocket] sendLandmarks called, isConnected: $_isConnected, channel exists: ${_channel != null}',
     );
@@ -328,6 +331,7 @@ class TranslationWebSocketService {
       final message = jsonEncode({
         'type': 'landmarks',
         'data': landmarks,
+        'mode': mode,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
       debugPrint(
@@ -335,7 +339,7 @@ class TranslationWebSocketService {
       );
       _channel!.sink.add(message);
       debugPrint(
-        '[WebSocket] Landmarks sent successfully: left=${landmarks['left_hand']?.length ?? 0} points, right=${landmarks['right_hand']?.length ?? 0} points',
+        '[WebSocket] Landmarks sent successfully: left=${landmarks['left_hand']?.length ?? 0} points, right=${landmarks['right_hand']?.length ?? 0} points, pose=${landmarks['pose']?.length ?? 0} points, mode=$mode',
       );
     } catch (e) {
       debugPrint('[WebSocket] Error sending landmarks: $e');
@@ -348,6 +352,21 @@ class TranslationWebSocketService {
     }
 
     _channel!.sink.add(jsonEncode({'type': 'reset'}));
+  }
+
+  void sendMode(String mode) {
+    if (_channel == null || !_isConnected) {
+      debugPrint('[WebSocket] Cannot send mode: not connected');
+      return;
+    }
+
+    try {
+      final message = jsonEncode({'type': 'set_mode', 'mode': mode});
+      _channel!.sink.add(message);
+      debugPrint('[WebSocket] Mode sent: $mode');
+    } catch (e) {
+      debugPrint('[WebSocket] Error sending mode: $e');
+    }
   }
 
   Future<void> disconnect() async {

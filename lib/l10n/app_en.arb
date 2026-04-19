@@ -45,5 +45,7 @@
   "serverError": "Server error",
   "tryAgain": "Try again",
   "sessionExpired": "Session expired",
-  "loginRequired": "You must login"
+  "loginRequired": "You must login",
+  "handshapes": "Handshapes",
+  "fingerspelling": "Fingerspelling"
 }

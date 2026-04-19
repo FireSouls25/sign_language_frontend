@@ -10,6 +10,7 @@
 #include <flutter_secure_storage_windows/flutter_secure_storage_windows_plugin.h>
 #include <flutter_tts/flutter_tts_plugin.h>
 #include <hand_detection/hand_detection_plugin.h>
+#include <pose_detection/pose_detection_plugin.h>
 #include <url_launcher_windows/url_launcher_windows.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
@@ -21,6 +22,8 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("FlutterTtsPlugin"));
   HandDetectionPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("HandDetectionPlugin"));
+  PoseDetectionPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("PoseDetectionPlugin"));
   UrlLauncherWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("UrlLauncherWindows"));
 }

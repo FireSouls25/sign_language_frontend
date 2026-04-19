@@ -183,5 +183,13 @@
   "loginRequired": "Debes iniciar sesión",
   "@loginRequired": {
     "description": "Login required message"
+  },
+  "handshapes": "Formas de mano",
+  "@handshapes": {
+    "description": "Handshapes mode button"
+  },
+  "fingerspelling": "Dactilología",
+  "@fingerspelling": {
+    "description": "Fingerspelling mode button"
   }
 }

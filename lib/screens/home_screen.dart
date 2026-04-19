@@ -30,10 +30,12 @@ class _HomeScreenState extends State<HomeScreen> {
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
   final FlutterTts _flutterTts = FlutterTts();
 
-  HandDetector? _handDetector;
+  HandDetectorIsolate? _handDetector;
   int _frameCounter = 0;
-  static const int _framesToProcess = 5;
+  static const int _framesToProcess = 3;
   bool _isHandDetectorInitialized = false;
+
+  String _signMode = 'handshape';
 
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
@@ -57,16 +59,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeHandDetector() async {
     try {
-      _handDetector = HandDetector(
+      _handDetector = await HandDetectorIsolate.spawn(
         mode: HandMode.boxesAndLandmarks,
-        landmarkModel: HandLandmarkModel.full,
-        performanceConfig: const PerformanceConfig.xnnpack(),
+        maxDetections: 2,
+        detectorConf: 0.5,
+        minLandmarkScore: 0.5,
+        performanceConfig: const PerformanceConfig.xnnpack(numThreads: 4),
       );
-      await _handDetector!.initialize();
       _isHandDetectorInitialized = true;
-      debugPrint('[HomeScreen] HandDetector initialized successfully');
+      debugPrint('[HomeScreen] HandDetectorIsolate initialized successfully');
     } catch (e) {
-      debugPrint('[HomeScreen] Error initializing HandDetector: $e');
+      debugPrint('[HomeScreen] Error initializing HandDetectorIsolate: $e');
       _isHandDetectorInitialized = false;
     }
   }
@@ -104,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _cameraController = CameraController(
       _cameras![cameraIndex],
-      ResolutionPreset.high,
+      ResolutionPreset.medium,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
@@ -241,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (landmarks['left_hand'] != null ||
               landmarks['right_hand'] != null) {
             debugPrint('[HomeScreen] Sending landmarks to WebSocket...');
-            _wsService.sendLandmarks(landmarks);
+            _wsService.sendLandmarks(landmarks, mode: _signMode);
             debugPrint('[HomeScreen] Landmarks sent successfully');
           } else {
             debugPrint('[HomeScreen] No hands detected, skipping send');
@@ -273,8 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final int detectionWidth = mat.cols;
       final int detectionHeight = mat.rows;
 
-      final List<Hand> hands = await _handDetector!.detectOnMat(mat);
-      mat.dispose();
+      final List<Hand> hands = await _handDetector!.detectHandsFromMat(mat);
 
       if (hands.isNotEmpty) {
         debugPrint('[HomeScreen] Detected ${hands.length} hand(s)');
@@ -299,6 +301,8 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         debugPrint('[HomeScreen] No hands detected in frame');
       }
+
+      mat.dispose();
     } catch (e) {
       debugPrint('[HomeScreen] Error processing image for landmarks: $e');
     }
@@ -479,6 +483,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
+          _buildModeSelector(l),
           Expanded(flex: 3, child: _buildCameraPreview()),
           Expanded(flex: 2, child: _buildTranslationResult(l)),
         ],
@@ -524,6 +529,59 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
       ],
     );
+  }
+
+  Widget _buildModeSelector(String Function(String) l) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Expanded(
+            child: _buildModeButton(
+              'handshape',
+              l('handshapes'),
+              Icons.pan_tool,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _buildModeButton(
+              'fingerspelling',
+              l('fingerspelling'),
+              Icons.keyboard,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton(String mode, String label, IconData icon) {
+    final isSelected = _signMode == mode;
+    return ElevatedButton.icon(
+      onPressed: () => _setSignMode(mode),
+      icon: Icon(icon, size: 20),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isSelected
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        foregroundColor: isSelected
+            ? Colors.white
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  void _setSignMode(String mode) {
+    setState(() {
+      _signMode = mode;
+    });
+    _wsService.sendMode(mode);
+    _wsService.sendReset();
   }
 
   Widget _buildTranslationResult(String Function(String) l) {
