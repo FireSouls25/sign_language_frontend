@@ -40,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
   String _currentTranslation = '';
+  String _currentCandidate = '';
   double _confidence = 0.0;
   Timer? _frameTimer;
   StreamSubscription? _translationSubscription;
@@ -107,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _cameraController = CameraController(
       _cameras![cameraIndex],
-      ResolutionPreset.medium,
+      ResolutionPreset.high,
       imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
@@ -145,10 +146,18 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         if (!mounted) return;
 
+        // Update candidate state
+        setState(() {
+          _currentCandidate = result.candidate;
+        });
+
         String displayText = result.text;
         double displayConfidence = result.confidence;
 
-        if (result.candidate.isNotEmpty && result.candidateConfidence >= 0.5) {
+        // Use candidate if text is empty and candidate has good confidence
+        if (result.candidate.isNotEmpty &&
+            result.text.isEmpty &&
+            result.candidateConfidence >= 0.3) {
           displayText = result.candidate;
           displayConfidence = result.candidateConfidence;
           debugPrint(
@@ -604,16 +613,31 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: Center(
-              child: Text(
-                _currentTranslation.isEmpty
-                    ? l('startTranslating')
-                    : _currentTranslation,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: _currentTranslation.isEmpty
-                      ? AppTheme.getTextSecondary(context)
-                      : Theme.of(context).colorScheme.primary,
-                ),
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _currentTranslation.isEmpty
+                        ? l('startTranslating')
+                        : _currentTranslation,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: _currentTranslation.isEmpty
+                          ? AppTheme.getTextSecondary(context)
+                          : Theme.of(context).colorScheme.primary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (_currentCandidate.isNotEmpty &&
+                      _currentTranslation.isEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Deletreando: $_currentCandidate',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.secondary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ),
