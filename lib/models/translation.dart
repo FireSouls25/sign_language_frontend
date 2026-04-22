@@ -81,6 +81,9 @@ class TranslationResult {
   final String candidate;
   final double candidateConfidence;
   final String? audio;
+  final String mode;
+  final bool isFinalized;
+  final String sequence;
 
   TranslationResult({
     required this.text,
@@ -91,6 +94,9 @@ class TranslationResult {
     this.candidate = '',
     this.candidateConfidence = 0.0,
     this.audio,
+    this.mode = 'handshape',
+    this.isFinalized = false,
+    this.sequence = '',
   });
 
   factory TranslationResult.fromJson(Map<String, dynamic> json) {
@@ -104,6 +110,9 @@ class TranslationResult {
       candidateConfidence:
           (json['candidate_confidence'] as num?)?.toDouble() ?? 0.0,
       audio: json['audio'] as String?,
+      mode: json['mode'] as String? ?? 'handshape',
+      isFinalized: json['is_finalized'] as bool? ?? false,
+      sequence: json['sequence'] as String? ?? '',
     );
   }
 }

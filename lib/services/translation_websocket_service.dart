@@ -346,12 +346,66 @@ class TranslationWebSocketService {
     }
   }
 
+  void sendFrame(
+    List<int> frameBytes, {
+    required int width,
+    required int height,
+    String mode = 'handshape',
+  }) {
+    debugPrint(
+      '[WebSocket] sendFrame called, isConnected: $_isConnected, channel exists: ${_channel != null}, frame size: ${frameBytes.length} bytes',
+    );
+
+    if (_channel == null || !_isConnected) {
+      debugPrint(
+        '[WebSocket] Not connected or channel null, scheduling reconnect...',
+      );
+      _scheduleReconnect();
+      return;
+    }
+
+    try {
+      final message = jsonEncode({
+        'type': 'frame',
+        'data': frameBytes,
+        'width': width,
+        'height': height,
+        'mode': mode,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+      debugPrint(
+        '[WebSocket] Sending frame message (${message.length} chars)...',
+      );
+      _channel!.sink.add(message);
+      debugPrint(
+        '[WebSocket] Frame sent successfully: ${width}x$height, mode=$mode',
+      );
+    } catch (e) {
+      debugPrint('[WebSocket] Error sending frame: $e');
+    }
+  }
+
   void sendReset() {
     if (_channel == null || !_isConnected) {
       throw Exception('WebSocket not connected');
     }
 
     _channel!.sink.add(jsonEncode({'type': 'reset'}));
+  }
+
+  void sendFinalize() {
+    if (_channel == null || !_isConnected) {
+      debugPrint('[WebSocket] Cannot send finalize: not connected');
+      return;
+    }
+
+    try {
+      final message = jsonEncode({'type': 'finalize'});
+      _channel!.sink.add(message);
+      debugPrint('[WebSocket] Finalize sent');
+    } catch (e) {
+      debugPrint('[WebSocket] Error sending finalize: $e');
+    }
   }
 
   void sendMode(String mode) {

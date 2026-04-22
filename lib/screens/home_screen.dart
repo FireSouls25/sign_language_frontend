@@ -7,6 +7,7 @@ import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
+import '../providers/translation_mode_provider.dart';
 import '../l10n/app_translations.dart';
 import '../services/translation_websocket_service.dart';
 import '../services/error_translator.dart';
@@ -146,28 +147,29 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         if (!mounted) return;
 
-        // Update candidate state
-        setState(() {
-          _currentCandidate = result.candidate;
-        });
-
+        // Handle fingerspelling differently - only show text when finalized
         String displayText = result.text;
         double displayConfidence = result.confidence;
 
-        // Use candidate if text is empty and candidate has good confidence
-        if (result.candidate.isNotEmpty &&
-            result.text.isEmpty &&
-            result.candidateConfidence >= 0.3) {
-          displayText = result.candidate;
-          displayConfidence = result.candidateConfidence;
-          debugPrint(
-            '[HomeScreen] Using candidate as translation: $displayText (confidence: ${displayConfidence.toStringAsFixed(2)})',
-          );
+        // In fingerspelling mode, only show text when finalized
+        if (result.mode == 'fingerspelling' && result.isFinalized == true) {
+          displayText = result.text;
+          displayConfidence = result.confidence;
+          debugPrint('[HomeScreen] Fingerspelling finalized: $displayText');
+        } else if (result.mode != 'fingerspelling') {
+          // For handshape mode, use candidate if text is empty
+          if (result.candidate.isNotEmpty &&
+              result.text.isEmpty &&
+              result.candidateConfidence >= 0.3) {
+            displayText = result.candidate;
+            displayConfidence = result.candidateConfidence;
+          }
+        } else {
+          displayText = '';
+          displayConfidence = 0.0;
         }
 
-        if (displayConfidence >= 0.5 &&
-            displayText.isNotEmpty &&
-            displayText != _currentTranslation) {
+        if (displayText.isNotEmpty && displayText != _currentTranslation) {
           debugPrint(
             '[HomeScreen] High confidence translation detected, triggering haptic',
           );
@@ -222,6 +224,9 @@ class _HomeScreenState extends State<HomeScreen> {
     debugPrint('[HomeScreen] Camera initialized, starting image stream');
     _frameCounter = 0;
 
+    final inputMode = context.read<TranslationModeProvider>().inputMode;
+    debugPrint('[HomeScreen] Input mode: $inputMode');
+
     setState(() {
       _isTranslating = true;
       _currentTranslation = '';
@@ -239,24 +244,42 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('[HomeScreen] Frame #$_frameCounter received');
 
         if (_frameCounter >= _framesToProcess &&
-            _isHandDetectorInitialized &&
-            _handDetector != null) {
+            inputMode == TranslationInputMode.landmarks) {
           _frameCounter = 0;
 
-          debugPrint('[HomeScreen] Processing frame for landmarks...');
-          final landmarks = await _processImageForLandmarks(image);
+          if (_isHandDetectorInitialized && _handDetector != null) {
+            debugPrint('[HomeScreen] Processing frame for landmarks...');
+            final landmarks = await _processImageForLandmarks(image);
 
-          debugPrint(
-            '[HomeScreen] Landmarks result: left=${landmarks['left_hand']?.length ?? 0}, right=${landmarks['right_hand']?.length ?? 0}',
-          );
+            debugPrint(
+              '[HomeScreen] Landmarks result: left=${landmarks['left_hand']?.length ?? 0}, right=${landmarks['right_hand']?.length ?? 0}',
+            );
 
-          if (landmarks['left_hand'] != null ||
-              landmarks['right_hand'] != null) {
-            debugPrint('[HomeScreen] Sending landmarks to WebSocket...');
-            _wsService.sendLandmarks(landmarks, mode: _signMode);
-            debugPrint('[HomeScreen] Landmarks sent successfully');
-          } else {
-            debugPrint('[HomeScreen] No hands detected, skipping send');
+            if (landmarks['left_hand'] != null ||
+                landmarks['right_hand'] != null) {
+              debugPrint('[HomeScreen] Sending landmarks to WebSocket...');
+              _wsService.sendLandmarks(landmarks, mode: _signMode);
+              debugPrint('[HomeScreen] Landmarks sent successfully');
+            } else {
+              debugPrint('[HomeScreen] No hands detected, skipping send');
+            }
+          }
+        } else if (_frameCounter >= _framesToProcess &&
+            inputMode == TranslationInputMode.frames) {
+          _frameCounter = 0;
+
+          debugPrint('[HomeScreen] Processing frame for sending...');
+          final frameData = await _convertCameraImageToBytes(image);
+
+          if (frameData != null) {
+            debugPrint('[HomeScreen] Sending frame to WebSocket...');
+            _wsService.sendFrame(
+              frameData,
+              width: image.width,
+              height: image.height,
+              mode: _signMode,
+            );
+            debugPrint('[HomeScreen] Frame sent successfully');
           }
         }
       } catch (e) {
@@ -405,6 +428,72 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<List<int>?> _convertCameraImageToBytes(CameraImage image) async {
+    try {
+      final int width = image.width;
+      final int height = image.height;
+
+      final bgrBytes = Uint8List(width * height * 3);
+      final int yRowStride = image.planes[0].bytesPerRow;
+      final int yPixelStride = image.planes[0].bytesPerPixel ?? 1;
+
+      void writePixel(int x, int y, int yp, int up, int vp) {
+        int r = (yp + vp * 1436 / 1024 - 179).round().clamp(0, 255);
+        int g = (yp - up * 46549 / 131072 + 44 - vp * 93604 / 131072 + 91)
+            .round()
+            .clamp(0, 255);
+        int b = (yp + up * 1814 / 1024 - 227).round().clamp(0, 255);
+        final int bgrIdx = (y * width + x) * 3;
+        bgrBytes[bgrIdx] = b;
+        bgrBytes[bgrIdx + 1] = g;
+        bgrBytes[bgrIdx + 2] = r;
+      }
+
+      if (image.planes.length == 2) {
+        final int uvRowStride = image.planes[1].bytesPerRow;
+        final int uvPixelStride = image.planes[1].bytesPerPixel ?? 2;
+        for (int y = 0; y < height; y++) {
+          for (int x = 0; x < width; x++) {
+            final int uvIndex =
+                uvPixelStride * (x ~/ 2) + uvRowStride * (y ~/ 2);
+            final int index = y * yRowStride + x * yPixelStride;
+            writePixel(
+              x,
+              y,
+              image.planes[0].bytes[index],
+              image.planes[1].bytes[uvIndex],
+              image.planes[1].bytes[uvIndex + 1],
+            );
+          }
+        }
+      } else if (image.planes.length >= 3) {
+        final int uvRowStride = image.planes[1].bytesPerRow;
+        final int uvPixelStride = image.planes[1].bytesPerPixel ?? 1;
+        for (int y = 0; y < height; y++) {
+          for (int x = 0; x < width; x++) {
+            final int uvIndex =
+                uvPixelStride * (x ~/ 2) + uvRowStride * (y ~/ 2);
+            final int index = y * yRowStride + x * yPixelStride;
+            writePixel(
+              x,
+              y,
+              image.planes[0].bytes[index],
+              image.planes[1].bytes[uvIndex],
+              image.planes[2].bytes[uvIndex],
+            );
+          }
+        }
+      } else {
+        return null;
+      }
+
+      return bgrBytes.toList();
+    } catch (e) {
+      debugPrint('[HomeScreen] Error converting CameraImage to bytes: $e');
+      return null;
+    }
+  }
+
   void _stopTranslation() {
     _cameraController?.stopImageStream();
     _frameTimer?.cancel();
@@ -415,7 +504,49 @@ class _HomeScreenState extends State<HomeScreen> {
       _wsService.sendReset();
     }
 
-    setState(() => _isTranslating = false);
+    setState(() {
+      _isTranslating = false;
+    });
+  }
+
+  void _cancelTranslation() {
+    debugPrint('[HomeScreen] _cancelTranslation called');
+    _cameraController?.stopImageStream();
+    _frameTimer?.cancel();
+    _frameTimer = null;
+    _frameCounter = 0;
+
+    if (_wsService.isConnected) {
+      _wsService.sendReset();
+    }
+
+    setState(() {
+      _isTranslating = false;
+      _currentTranslation = '';
+      _currentCandidate = '';
+      _confidence = 0.0;
+    });
+
+    debugPrint('[HomeScreen] Translation cancelled, sequence reset');
+  }
+
+  void _finalizeTranslation() {
+    debugPrint('[HomeScreen] _finalizeTranslation called');
+    _cameraController?.stopImageStream();
+    _frameTimer?.cancel();
+    _frameTimer = null;
+    _frameCounter = 0;
+
+    setState(() {
+      _isTranslating = false;
+    });
+
+    if (_wsService.isConnected) {
+      debugPrint('[HomeScreen] Sending finalize request...');
+      _wsService.sendFinalize();
+    }
+
+    debugPrint('[HomeScreen] Finalize request sent');
   }
 
   Future<void> _speak(String text) async {
@@ -495,10 +626,50 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildModeSelector(l),
           Expanded(flex: 3, child: _buildCameraPreview()),
           Expanded(flex: 2, child: _buildTranslationResult(l)),
+          if (_isTranslating) _buildActionButtons(l),
         ],
       ),
-      floatingActionButton: _buildTranslateButton(l),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _isTranslating ? null : _buildStartButton(l),
+    );
+  }
+
+  Widget _buildStartButton(String Function(String) l) {
+    return FloatingActionButton.extended(
+      onPressed: _startTranslation,
+      backgroundColor: Theme.of(context).colorScheme.primary,
+      icon: const Icon(Icons.translate),
+      label: Text(l('translateWord')),
+    );
+  }
+
+  Widget _buildActionButtons(String Function(String) l) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          ElevatedButton.icon(
+            onPressed: _cancelTranslation,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            icon: const Icon(Icons.close),
+            label: Text(l('cancelTranslating')),
+          ),
+          ElevatedButton.icon(
+            onPressed: _finalizeTranslation,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            icon: const Icon(Icons.check),
+            label: Text(l('finalizeTranslating')),
+          ),
+        ],
+      ),
     );
   }
 
@@ -631,7 +802,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _currentTranslation.isEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Deletreando: $_currentCandidate',
+                      'Detectando: $_currentCandidate',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Theme.of(context).colorScheme.secondary,
                       ),
@@ -675,17 +846,6 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 80),
         ],
       ),
-    );
-  }
-
-  Widget _buildTranslateButton(String Function(String) l) {
-    return FloatingActionButton.extended(
-      onPressed: _isTranslating ? _stopTranslation : _startTranslation,
-      backgroundColor: _isTranslating
-          ? Colors.red
-          : Theme.of(context).colorScheme.primary,
-      icon: Icon(_isTranslating ? Icons.stop : Icons.translate),
-      label: Text(_isTranslating ? l('stopTranslating') : l('translateWord')),
     );
   }
 }

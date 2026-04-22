@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/translation_mode_provider.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
 import 'logs_screen.dart';
@@ -123,6 +124,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       authProvider.toggleVoice(value);
                     },
                     secondary: const Icon(Icons.volume_up),
+                  ),
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: Icon(
+                      Icons.camera_alt,
+                      color: AppTheme.getIconPrimary(context),
+                    ),
+                    title: Text(l('inputMode')),
+                    subtitle: Text(l('inputModeDesc')),
+                    trailing: Switch(
+                      value: context
+                          .watch<TranslationModeProvider>()
+                          .isFrameMode,
+                      activeColor: Theme.of(context).colorScheme.primary,
+                      onChanged: (bool value) {
+                        context.read<TranslationModeProvider>().setInputMode(
+                          value
+                              ? TranslationInputMode.frames
+                              : TranslationInputMode.landmarks,
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 8),
                   ListTile(

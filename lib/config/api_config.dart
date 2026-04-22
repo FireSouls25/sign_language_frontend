@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../main.dart' show EnvVars;
 
 enum Environment { development, production }
 
@@ -9,18 +10,11 @@ class ApiConfig {
   static Environment get currentEnvironment => _environment;
 
   static String get baseUrl {
-    switch (_environment) {
-      case Environment.development:
-        return 'https://sign-language-backend-vqq1.onrender.com';
-      case Environment.production:
-        return 'https://sign-language-backend-vqq1.onrender.com';
-    }
+    return EnvVars.backendUrl;
   }
 
   static String get wsUrl {
-    final base = _environment == Environment.development
-        ? 'wss://sign-language-backend-vqq1.onrender.com'
-        : 'wss://sign-language-backend-vqq1.onrender.com';
+    final base = EnvVars.backendWsUrl;
     return '$base/ws/translate';
   }
 

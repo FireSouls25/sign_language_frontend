@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
+import 'package:flutter/services.dart';
 import 'config/api_config.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
+import 'providers/translation_mode_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/deep_link_service.dart';
 import 'services/error_translator.dart';
 
-void main() {
+class EnvVars {
+  static String backendUrl = 'https://sign-language-backend-vqq1.onrender.com';
+  static String backendWsUrl = 'wss://sign-language-backend-vqq1.onrender.com';
+}
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await _loadEnvFromAssets();
 
   FlutterError.onError = (FlutterErrorDetails details) {
     ErrorTranslator.saveUnhandledError(
@@ -22,6 +31,30 @@ void main() {
   };
 
   runApp(const LSCTranslatorApp());
+}
+
+Future<void> _loadEnvFromAssets() async {
+  try {
+    final content = await rootBundle.loadString('.env');
+    final lines = content.split('\n');
+    for (var line in lines) {
+      line = line.trim();
+      if (line.isEmpty || line.startsWith('#')) continue;
+      final parts = line.split('=');
+      if (parts.length == 2) {
+        final key = parts[0].trim();
+        final value = parts[1].trim();
+        if (key == 'BACKEND_URL') {
+          EnvVars.backendUrl = value;
+        } else if (key == 'BACKEND_WS_URL') {
+          EnvVars.backendWsUrl = value;
+        }
+      }
+    }
+    debugPrint('[main] Loaded env: BACKEND_URL=${EnvVars.backendUrl}');
+  } catch (e) {
+    debugPrint('[main] Could not load .env, using defaults: $e');
+  }
 }
 
 class LSCTranslatorApp extends StatefulWidget {
@@ -49,6 +82,7 @@ class _LSCTranslatorAppState extends State<LSCTranslatorApp> {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
+        ChangeNotifierProvider(create: (_) => TranslationModeProvider()),
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(
         builder: (context, themeProvider, localeProvider, child) {
