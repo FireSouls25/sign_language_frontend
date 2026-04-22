@@ -802,7 +802,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _currentTranslation.isEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      'Detectando: $_currentCandidate',
+                      '${l('detecting')} $_currentCandidate',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Theme.of(context).colorScheme.secondary,
                       ),

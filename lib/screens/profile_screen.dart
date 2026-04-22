@@ -132,7 +132,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: AppTheme.getIconPrimary(context),
                     ),
                     title: Text(l('inputMode')),
-                    subtitle: Text(l('inputModeDesc')),
+                    subtitle: Text(
+                      context.watch<TranslationModeProvider>().isFrameMode
+                          ? l('sendFrames')
+                          : l('sendLandmarks'),
+                    ),
                     trailing: Switch(
                       value: context
                           .watch<TranslationModeProvider>()

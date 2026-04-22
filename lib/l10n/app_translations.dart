@@ -103,8 +103,9 @@ class AppTranslations {
       'noFavoritesYet': 'Aún no tienes traducciones favoritas',
       'inputMode': 'Modo de envío',
       'inputModeDesc': 'Elegir cómo enviar datos al servidor',
-      'sendLandmarks': 'Landmarks (Actual)',
+      'sendLandmarks': 'Landmarks (más rápido)',
       'sendFrames': 'Frames completos',
+      'detecting': 'Detectando:',
     },
     'en': {
       'appTitle': 'LSC Translator',
@@ -204,8 +205,9 @@ class AppTranslations {
       'noFavoritesYet': "You don't have any favorite translations yet",
       'inputMode': 'Input Mode',
       'inputModeDesc': 'Choose how to send data to the server',
-      'sendLandmarks': 'Landmarks (Current)',
+      'sendLandmarks': 'Landmarks (faster)',
       'sendFrames': 'Full Frames',
+      'detecting': 'Detecting:',
     },
   };
 
