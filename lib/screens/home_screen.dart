@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'package:hand_detection/hand_detection.dart';
+import 'package:hand_landmarker/hand_landmarker.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -31,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
   final FlutterTts _flutterTts = FlutterTts();
 
-  HandDetectorIsolate? _handDetector;
+  HandLandmarkerPlugin? _handDetector;
   int _frameCounter = 0;
   static const int _framesToProcess = 3;
   bool _isHandDetectorInitialized = false;
@@ -61,17 +61,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initializeHandDetector() async {
     try {
-      _handDetector = await HandDetectorIsolate.spawn(
-        mode: HandMode.boxesAndLandmarks,
-        maxDetections: 2,
-        detectorConf: 0.5,
-        minLandmarkScore: 0.5,
-        performanceConfig: const PerformanceConfig.xnnpack(numThreads: 4),
+      _handDetector = HandLandmarkerPlugin.create(
+        numHands: 2,
+        minHandDetectionConfidence: 0.7,
+        delegate: HandLandmarkerDelegate.gpu,
       );
       _isHandDetectorInitialized = true;
-      debugPrint('[HomeScreen] HandDetectorIsolate initialized successfully');
+      debugPrint('[HomeScreen] HandLandmarkerPlugin initialized successfully');
     } catch (e) {
-      debugPrint('[HomeScreen] Error initializing HandDetectorIsolate: $e');
+      debugPrint('[HomeScreen] Error initializing HandLandmarkerPlugin: $e');
       _isHandDetectorInitialized = false;
     }
   }
@@ -239,47 +237,47 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
+      final inputMode = context.read<TranslationModeProvider>().inputMode;
+
       try {
         _frameCounter++;
         debugPrint('[HomeScreen] Frame #$_frameCounter received');
 
         if (_frameCounter >= _framesToProcess &&
-            inputMode == TranslationInputMode.landmarks) {
+            _isHandDetectorInitialized &&
+            _handDetector != null) {
           _frameCounter = 0;
 
-          if (_isHandDetectorInitialized && _handDetector != null) {
-            debugPrint('[HomeScreen] Processing frame for landmarks...');
-            final landmarks = await _processImageForLandmarks(image);
+          debugPrint('[HomeScreen] Processing frame for landmarks...');
+          final landmarks = await _processImageForLandmarks(image);
 
-            debugPrint(
-              '[HomeScreen] Landmarks result: left=${landmarks['left_hand']?.length ?? 0}, right=${landmarks['right_hand']?.length ?? 0}',
-            );
+          debugPrint(
+            '[HomeScreen] Landmarks result: left=${landmarks['left_hand']?.length ?? 0}, right=${landmarks['right_hand']?.length ?? 0}',
+          );
 
-            if (landmarks['left_hand'] != null ||
-                landmarks['right_hand'] != null) {
-              debugPrint('[HomeScreen] Sending landmarks to WebSocket...');
-              _wsService.sendLandmarks(landmarks, mode: _signMode);
-              debugPrint('[HomeScreen] Landmarks sent successfully');
-            } else {
-              debugPrint('[HomeScreen] No hands detected, skipping send');
-            }
+          if (landmarks['left_hand'] != null ||
+              landmarks['right_hand'] != null) {
+            debugPrint('[HomeScreen] Sending landmarks to WebSocket...');
+            _wsService.sendLandmarks(landmarks, mode: _signMode);
+            debugPrint('[HomeScreen] Landmarks sent successfully');
+          } else {
+            debugPrint('[HomeScreen] No hands detected, skipping send');
           }
-        } else if (_frameCounter >= _framesToProcess &&
-            inputMode == TranslationInputMode.frames) {
-          _frameCounter = 0;
 
-          debugPrint('[HomeScreen] Processing frame for sending...');
-          final frameData = await _convertCameraImageToBytes(image);
+          if (inputMode == TranslationInputMode.frames) {
+            debugPrint('[HomeScreen] Processing frame for sending...');
+            final frameData = await _convertCameraImageToBytes(image);
 
-          if (frameData != null) {
-            debugPrint('[HomeScreen] Sending frame to WebSocket...');
-            _wsService.sendFrame(
-              frameData,
-              width: image.width,
-              height: image.height,
-              mode: _signMode,
-            );
-            debugPrint('[HomeScreen] Frame sent successfully');
+            if (frameData != null) {
+              debugPrint('[HomeScreen] Sending frame to WebSocket...');
+              _wsService.sendFrame(
+                frameData,
+                width: image.width,
+                height: image.height,
+                mode: _signMode,
+              );
+              debugPrint('[HomeScreen] Frame sent successfully');
+            }
           }
         }
       } catch (e) {
@@ -299,42 +297,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     try {
-      cv.Mat? mat = await _convertCameraImageToMat(image);
-      if (mat == null) {
-        debugPrint('[HomeScreen] Failed to convert camera image to Mat');
-        return landmarks;
-      }
-
-      final int detectionWidth = mat.cols;
-      final int detectionHeight = mat.rows;
-
-      final List<Hand> hands = await _handDetector!.detectHandsFromMat(mat);
+      // Use the new API with detect() method
+      final sensorOrientation =
+          _cameraController?.description.sensorOrientation ?? 0;
+      final List<Hand> hands = _handDetector!.detect(image, sensorOrientation);
 
       if (hands.isNotEmpty) {
         debugPrint('[HomeScreen] Detected ${hands.length} hand(s)');
         for (int i = 0; i < hands.length; i++) {
           final hand = hands[i];
-          if (hand.hasLandmarks) {
-            final handLandmarks = hand.landmarks
-                .map((point) => [point.x, point.y, point.z])
-                .toList();
+          final handLandmarks = hand.landmarks
+              .map((point) => [point.x, point.y, point.z])
+              .toList();
 
-            debugPrint(
-              '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks, image size: ${detectionWidth}x${detectionHeight}',
-            );
+          debugPrint(
+            '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks',
+          );
 
-            if (hand.handedness == Handedness.left) {
-              landmarks['left_hand'] = handLandmarks;
-            } else if (hand.handedness == Handedness.right) {
-              landmarks['right_hand'] = handLandmarks;
-            }
+          // Determine handedness from wrist (landmark 0) position
+          // x > 0.5 means hand is on right side of image
+          final wristX = hand.landmarks[0].x;
+          if (wristX > 0.5) {
+            landmarks['right_hand'] = handLandmarks;
+          } else {
+            landmarks['left_hand'] = handLandmarks;
           }
         }
       } else {
         debugPrint('[HomeScreen] No hands detected in frame');
       }
-
-      mat.dispose();
     } catch (e) {
       debugPrint('[HomeScreen] Error processing image for landmarks: $e');
     }

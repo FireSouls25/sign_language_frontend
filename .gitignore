@@ -11,7 +11,8 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
-.env
+
+# Note: .env is committed since it contains only URLs (no secrets)
 
 # IntelliJ related
 *.iml

@@ -6,13 +6,13 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   flutter_secure_storage_windows
   flutter_tts
-  hand_detection
   pose_detection
   url_launcher_windows
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
   flutter_litert
+  jni
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)
