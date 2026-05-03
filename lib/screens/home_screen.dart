@@ -306,17 +306,23 @@ class _HomeScreenState extends State<HomeScreen> {
         debugPrint('[HomeScreen] Detected ${hands.length} hand(s)');
         for (int i = 0; i < hands.length; i++) {
           final hand = hands[i];
-          final handLandmarks = hand.landmarks
-              .map((point) => [point.x, point.y, point.z])
+
+          // Get raw landmarks (before mirroring)
+          final rawLandmarks = hand.landmarks
+              .map<List<double>>((point) => <double>[point.x, point.y, point.z])
               .toList();
 
           debugPrint(
-            '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks',
+            '[HomeScreen] Hand $i has ${rawLandmarks.length} landmarks',
           );
 
-          // Determine handedness from wrist (landmark 0) position
+          // Mirror landmarks: flip x coordinates and swap left/right
+          // This matches cv2.flip(frame, 1) behavior in Python scripts
+          final handLandmarks = _mirrorLandmarks(rawLandmarks);
+
+          // Determine handedness from mirrored wrist position
           // x > 0.5 means hand is on right side of image
-          final wristX = hand.landmarks[0].x;
+          final wristX = handLandmarks[0][0];
           if (wristX > 0.5) {
             landmarks['right_hand'] = handLandmarks;
           } else {
@@ -331,6 +337,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return landmarks;
+  }
+
+  List<List<double>> _mirrorLandmarks(List<List<double>> rawLandmarks) {
+    // Mirror landmarks: flip x coordinates (1.0 - x)
+    // This matches cv2.flip(frame, 1) in Python scripts
+    if (rawLandmarks == null || rawLandmarks.length < 21) {
+      return rawLandmarks;
+    }
+
+    return rawLandmarks.take(21).map<List<double>>((point) {
+      final x = point[0];
+      final y = point[1];
+      final z = point.length > 2 ? point[2] : 0.0;
+      return <double>[1.0 - x, y, z];
+    }).toList();
   }
 
   Future<cv.Mat?> _convertCameraImageToMat(CameraImage image) async {
