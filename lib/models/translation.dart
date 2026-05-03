@@ -84,6 +84,7 @@ class TranslationResult {
   final String mode;
   final bool isFinalized;
   final String sequence;
+  final String? warning;
 
   TranslationResult({
     required this.text,
@@ -97,6 +98,7 @@ class TranslationResult {
     this.mode = 'handshape',
     this.isFinalized = false,
     this.sequence = '',
+    this.warning,
   });
 
   factory TranslationResult.fromJson(Map<String, dynamic> json) {
@@ -113,6 +115,7 @@ class TranslationResult {
       mode: json['mode'] as String? ?? 'handshape',
       isFinalized: json['is_finalized'] as bool? ?? false,
       sequence: json['sequence'] as String? ?? '',
+      warning: json['warning'] as String?,
     );
   }
 }

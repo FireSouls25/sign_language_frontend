@@ -24,7 +24,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   int _currentCameraIndex = 0;
@@ -48,15 +48,54 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription? _errorSubscription;
   StreamSubscription? _connectionSubscription;
   bool _isVoiceEnabled = true;
+  bool _isLandscape = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isVoiceEnabled = context.read<AuthProvider>().isVoiceEnabled;
     _initializeHandDetector();
     _initializeCamera();
     _initializeWebSocket();
     _initializeTts();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateOrientation();
+      }
+    });
+  }
+
+  void _updateOrientation() {
+    if (!mounted) return;
+    final orientation = MediaQuery.of(context).orientation;
+    setState(() {
+      _isLandscape = orientation == Orientation.landscape;
+    });
+  }
+
+  @override
+  void didChangeMetrics() {
+    _updateOrientation();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _frameTimer?.cancel();
+    _translationSubscription?.cancel();
+    _errorSubscription?.cancel();
+    _connectionSubscription?.cancel();
+    _wsService.dispose();
+    _flutterTts.stop();
+    _cameraController?.dispose();
+    _handDetector?.dispose();
+    super.dispose();
   }
 
   Future<void> _initializeHandDetector() async {
@@ -184,6 +223,18 @@ class _HomeScreenState extends State<HomeScreen> {
         if (_isVoiceEnabled && displayText.isNotEmpty) {
           _speak(displayText);
         }
+
+        if (result.warning == 'rotate_camera') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Rota el dispositivo a modo horizontal para usar fingerspelling',
+              ),
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       });
 
       _errorSubscription = _wsService.errorStream.listen((error) {
@@ -307,22 +358,18 @@ class _HomeScreenState extends State<HomeScreen> {
         for (int i = 0; i < hands.length; i++) {
           final hand = hands[i];
 
-          // Get raw landmarks (before mirroring)
-          final rawLandmarks = hand.landmarks
+          // Get landmarks directly - no flip needed
+          // MediaPipe on mobile handles front camera the same as cv2.flip in local scripts
+          final handLandmarks = hand.landmarks
               .map<List<double>>((point) => <double>[point.x, point.y, point.z])
               .toList();
 
           debugPrint(
-            '[HomeScreen] Hand $i has ${rawLandmarks.length} landmarks',
+            '[HomeScreen] Hand $i has ${handLandmarks.length} landmarks',
           );
 
-          // Mirror landmarks: flip x coordinates and swap left/right
-          // This matches cv2.flip(frame, 1) behavior in Python scripts
-          final handLandmarks = _mirrorLandmarks(rawLandmarks);
-
-          // Determine handedness from mirrored wrist position
-          // x > 0.5 means hand is on right side of image
-          final wristX = handLandmarks[0][0];
+          // Determine handedness from wrist position
+          final wristX = hand.landmarks[0].x;
           if (wristX > 0.5) {
             landmarks['right_hand'] = handLandmarks;
           } else {
@@ -337,21 +384,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return landmarks;
-  }
-
-  List<List<double>> _mirrorLandmarks(List<List<double>> rawLandmarks) {
-    // Mirror landmarks: flip x coordinates (1.0 - x)
-    // This matches cv2.flip(frame, 1) in Python scripts
-    if (rawLandmarks == null || rawLandmarks.length < 21) {
-      return rawLandmarks;
-    }
-
-    return rawLandmarks.take(21).map<List<double>>((point) {
-      final x = point[0];
-      final y = point[1];
-      final z = point.length > 2 ? point[2] : 0.0;
-      return <double>[1.0 - x, y, z];
-    }).toList();
   }
 
   Future<cv.Mat?> _convertCameraImageToMat(CameraImage image) async {
@@ -591,19 +623,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void dispose() {
-    _frameTimer?.cancel();
-    _translationSubscription?.cancel();
-    _errorSubscription?.cancel();
-    _connectionSubscription?.cancel();
-    _wsService.dispose();
-    _flutterTts.stop();
-    _cameraController?.dispose();
-    _handDetector?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final l = (String key) => AppTranslations.text(context, key);
 
@@ -646,11 +665,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStartButton(String Function(String) l) {
+    final bool canTranslate = _signMode != 'fingerspelling' || _isLandscape;
     return FloatingActionButton.extended(
-      onPressed: _startTranslation,
+      onPressed: canTranslate ? _startTranslation : null,
       backgroundColor: Theme.of(context).colorScheme.primary,
       icon: const Icon(Icons.translate),
-      label: Text(l('translateWord')),
+      label: Text(canTranslate ? l('translateWord') : 'Gira el dispositivo'),
     );
   }
 
@@ -717,6 +737,32 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
               ).colorScheme.primary.withOpacity(0.8),
               child: const Icon(Icons.flip_camera_ios, color: Colors.white),
+            ),
+          ),
+        if (_signMode == 'fingerspelling' && !_isLandscape)
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.orange,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.screen_rotation, color: Colors.white, size: 18),
+                  SizedBox(width: 4),
+                  Text(
+                    'Landscape',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
       ],
