@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _errorSubscription;
   StreamSubscription? _connectionSubscription;
   bool _isVoiceEnabled = true;
-  bool _isLandscape = true;
+  bool _isDeviceLandscape = true;
   String _localeCode = 'es';
 
   @override
@@ -79,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final orientation = MediaQuery.of(context).orientation;
     _localeCode = context.read<LocaleProvider>().locale.languageCode;
     setState(() {
-      _isLandscape = orientation == Orientation.landscape;
+      _isDeviceLandscape = orientation == Orientation.landscape;
     });
   }
 
@@ -657,55 +657,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          _buildModeSelector(l),
-          Expanded(flex: 3, child: _buildCameraPreview()),
-          Expanded(flex: 2, child: _buildTranslationResult(l)),
-          if (_isTranslating) _buildActionButtons(l),
-        ],
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isLandscape = constraints.maxWidth > constraints.maxHeight;
+
+          if (isLandscape) {
+            return Row(
+              children: [
+                SizedBox(
+                  width: constraints.maxWidth * 0.5,
+                  child: Column(
+                    children: [
+                      _buildModeSelector(l),
+                      Expanded(child: _buildCameraPreview()),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Expanded(child: _buildTranslationResult(l)),
+                      _buildActionButton(l),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          }
+
+          return Column(
+            children: [
+              _buildModeSelector(l),
+              Expanded(flex: 3, child: _buildCameraPreview()),
+              Expanded(flex: 2, child: _buildTranslationResult(l)),
+              _buildActionButton(l),
+            ],
+          );
+        },
       ),
-      floatingActionButton: _isTranslating ? null : _buildStartButton(l),
     );
   }
 
-  Widget _buildStartButton(String Function(String) l) {
-    final bool canTranslate = _signMode != 'fingerspelling' || _isLandscape;
-    return FloatingActionButton.extended(
-      onPressed: canTranslate ? _startTranslation : null,
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      icon: const Icon(Icons.translate),
-      label: Text(canTranslate ? l('translateWord') : l('rotateDeviceButton')),
-    );
-  }
+  Widget _buildActionButton(String Function(String) l) {
+    if (_signMode == 'fingerspelling' && !_isDeviceLandscape) {
+      return const SizedBox.shrink();
+    }
 
-  Widget _buildActionButtons(String Function(String) l) {
+    if (_isTranslating) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _cancelTranslation,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.close),
+                label: Text(l('cancelTranslating')),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: _finalizeTranslation,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                icon: const Icon(Icons.check),
+                label: Text(l('finalizeTranslating')),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          ElevatedButton.icon(
-            onPressed: _cancelTranslation,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.grey,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            icon: const Icon(Icons.close),
-            label: Text(l('cancelTranslating')),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _startTranslation,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12),
           ),
-          ElevatedButton.icon(
-            onPressed: _finalizeTranslation,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            icon: const Icon(Icons.check),
-            label: Text(l('finalizeTranslating')),
-          ),
-        ],
+          icon: const Icon(Icons.translate),
+          label: Text(l('translateWord')),
+        ),
       ),
     );
   }
@@ -744,7 +790,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: const Icon(Icons.flip_camera_ios, color: Colors.white),
             ),
           ),
-        if (_signMode == 'fingerspelling' && !_isLandscape)
+        if (_signMode == 'fingerspelling' && !_isDeviceLandscape)
           Positioned(
             top: 16,
             left: 16,
