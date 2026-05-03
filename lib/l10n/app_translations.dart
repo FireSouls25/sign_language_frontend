@@ -111,6 +111,8 @@ class AppTranslations {
       'rotateDeviceButton': 'Gira el dispositivo',
       'landscape': 'Horizontal',
       'errorUnknown': 'Error desconocido',
+      'fingerspelling': 'Dactilología',
+      'handshapes': 'Señas',
     },
     'en': {
       'appTitle': 'LSC Translator',
@@ -217,6 +219,8 @@ class AppTranslations {
       'rotateDeviceButton': 'Rotate device',
       'landscape': 'Landscape',
       'errorUnknown': 'Unknown error',
+      'fingerspelling': 'Fingerspelling',
+      'handshapes': 'Signs',
     },
   };
 
