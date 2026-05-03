@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const int _framesToProcess = 3;
   bool _isHandDetectorInitialized = false;
 
-  String _signMode = 'handshape';
+  String _signMode = 'fingerspelling';
 
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
@@ -197,14 +197,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           displayText = result.text;
           displayConfidence = result.confidence;
           debugPrint('[HomeScreen] Fingerspelling finalized: $displayText');
-        } else if (result.mode != 'fingerspelling') {
-          // For handshape mode, use candidate if text is empty
-          if (result.candidate.isNotEmpty &&
-              result.text.isEmpty &&
-              result.candidateConfidence >= 0.3) {
-            displayText = result.candidate;
-            displayConfidence = result.candidateConfidence;
-          }
         } else {
           displayText = '';
           displayConfidence = 0.0;
@@ -830,14 +822,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: _buildModeButton(
-              'handshape',
-              l('handshapes'),
-              Icons.pan_tool,
-            ),
-          ),
-          const SizedBox(width: 12),
           Expanded(
             child: _buildModeButton(
               'fingerspelling',

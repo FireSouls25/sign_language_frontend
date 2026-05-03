@@ -95,7 +95,7 @@ class TranslationResult {
     this.candidate = '',
     this.candidateConfidence = 0.0,
     this.audio,
-    this.mode = 'handshape',
+    this.mode = 'fingerspelling',
     this.isFinalized = false,
     this.sequence = '',
     this.warning,

@@ -313,7 +313,7 @@ class TranslationWebSocketService {
 
   void sendLandmarks(
     Map<String, List<List<double>>> landmarks, {
-    String mode = 'handshape',
+    String mode = 'fingerspelling',
   }) {
     debugPrint(
       '[WebSocket] sendLandmarks called, isConnected: $_isConnected, channel exists: ${_channel != null}',
@@ -350,7 +350,7 @@ class TranslationWebSocketService {
     List<int> frameBytes, {
     required int width,
     required int height,
-    String mode = 'handshape',
+    String mode = 'fingerspelling',
   }) {
     debugPrint(
       '[WebSocket] sendFrame called, isConnected: $_isConnected, channel exists: ${_channel != null}, frame size: ${frameBytes.length} bytes',
