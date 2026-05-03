@@ -70,6 +70,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _updateOrientation();
+        _updateDeviceOrientation();
       }
     });
   }
@@ -81,6 +82,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {
       _isDeviceLandscape = orientation == Orientation.landscape;
     });
+  }
+
+  void _updateDeviceOrientation() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   @override
@@ -622,6 +628,85 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final l = (String key) => AppTranslations.text(context, key);
+    final orientation = MediaQuery.of(context).orientation;
+    final isLandscapeDevice = orientation == Orientation.landscape;
+
+    if (isLandscapeDevice) {
+      return Scaffold(
+        appBar: LSAppBar(
+          title: l('translation'),
+          showConnectionIndicator: true,
+          isConnected: _wsService.isConnected,
+          isConnecting: _wsService.isConnecting,
+          showLanguageSelector: true,
+          toolbarHeight: kToolbarHeight - 5,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.history, size: 20),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.person, size: 20),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                );
+              },
+            ),
+          ],
+        ),
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            return Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: _cameraController != null && _isCameraInitialized
+                          ? CameraPreview(_cameraController!)
+                          : const Center(child: CircularProgressIndicator()),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 2, 4, 4),
+                    child: Column(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 4),
+                            child: SizedBox.expand(
+                              child: _buildTranslationResult(l),
+                            ),
+                          ),
+                        ),
+                        _buildActionButton(l),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: LSAppBar(
@@ -630,6 +715,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         isConnected: _wsService.isConnected,
         isConnecting: _wsService.isConnecting,
         showLanguageSelector: true,
+        toolbarHeight: kToolbarHeight - 3,
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -651,35 +737,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final isLandscape = constraints.maxWidth > constraints.maxHeight;
-
-          if (isLandscape) {
-            return Row(
-              children: [
-                SizedBox(
-                  width: constraints.maxWidth * 0.5,
-                  child: Column(
-                    children: [
-                      _buildModeSelector(l),
-                      Expanded(child: _buildCameraPreview()),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(child: _buildTranslationResult(l)),
-                      _buildActionButton(l),
-                    ],
-                  ),
-                ),
-              ],
-            );
-          }
-
           return Column(
             children: [
-              _buildModeSelector(l),
               Expanded(flex: 3, child: _buildCameraPreview()),
               Expanded(flex: 2, child: _buildTranslationResult(l)),
               _buildActionButton(l),
@@ -817,40 +876,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildModeSelector(String Function(String) l) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded(
-            child: _buildModeButton(
-              'fingerspelling',
-              l('fingerspelling'),
-              Icons.keyboard,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeButton(String mode, String label, IconData icon) {
-    final isSelected = _signMode == mode;
-    return ElevatedButton.icon(
-      onPressed: () => _setSignMode(mode),
-      icon: Icon(icon, size: 20),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: isSelected
-            ? Theme.of(context).colorScheme.primary
-            : Theme.of(context).colorScheme.surfaceContainerHighest,
-        foregroundColor: isSelected
-            ? Colors.white
-            : Theme.of(context).colorScheme.onSurfaceVariant,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   void _setSignMode(String mode) {
@@ -862,9 +888,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildTranslationResult(String Function(String) l) {
+    final isCompact = _isDeviceLandscape;
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: isCompact ? const EdgeInsets.all(4) : const EdgeInsets.all(16),
+      padding: isCompact ? const EdgeInsets.all(8) : const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppTheme.getSurfaceColor(context),
         borderRadius: BorderRadius.circular(12),
@@ -873,12 +900,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            l('translation'),
+            isCompact ? '' : l('translation'),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
+          if (!isCompact) const SizedBox(height: 8),
           Expanded(
             child: Center(
               child: Column(

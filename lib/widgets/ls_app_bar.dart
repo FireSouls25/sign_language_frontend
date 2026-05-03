@@ -14,6 +14,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool automaticallyImplyLeading;
   final bool showThemeToggle;
   final bool showLanguageSelector;
+  final double toolbarHeight;
 
   const LSAppBar({
     super.key,
@@ -26,10 +27,11 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.automaticallyImplyLeading = true,
     this.showThemeToggle = true,
     this.showLanguageSelector = false,
+    this.toolbarHeight = kToolbarHeight,
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => Size.fromHeight(toolbarHeight);
 
   @override
   Widget build(BuildContext context) {
