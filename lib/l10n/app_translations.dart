@@ -106,6 +106,11 @@ class AppTranslations {
       'sendLandmarks': 'Landmarks (más rápido)',
       'sendFrames': 'Frames completos',
       'detecting': 'Detectando:',
+      'rotateDevice':
+          'Rota el dispositivo a modo horizontal para usar fingerspelling',
+      'rotateDeviceButton': 'Gira el dispositivo',
+      'landscape': 'Horizontal',
+      'errorUnknown': 'Error desconocido',
     },
     'en': {
       'appTitle': 'LSC Translator',
@@ -208,6 +213,10 @@ class AppTranslations {
       'sendLandmarks': 'Landmarks (faster)',
       'sendFrames': 'Full Frames',
       'detecting': 'Detecting:',
+      'rotateDevice': 'Rotate device to landscape mode to use fingerspelling',
+      'rotateDeviceButton': 'Rotate device',
+      'landscape': 'Landscape',
+      'errorUnknown': 'Unknown error',
     },
   };
 

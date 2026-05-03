@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import '../providers/auth_provider.dart';
 import '../providers/translation_mode_provider.dart';
+import '../providers/locale_provider.dart';
 import '../l10n/app_translations.dart';
 import '../services/translation_websocket_service.dart';
 import '../services/error_translator.dart';
@@ -49,12 +50,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   StreamSubscription? _connectionSubscription;
   bool _isVoiceEnabled = true;
   bool _isLandscape = true;
+  String _localeCode = 'es';
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _isVoiceEnabled = context.read<AuthProvider>().isVoiceEnabled;
+    _localeCode = context.read<LocaleProvider>().locale.languageCode;
     _initializeHandDetector();
     _initializeCamera();
     _initializeWebSocket();
@@ -74,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _updateOrientation() {
     if (!mounted) return;
     final orientation = MediaQuery.of(context).orientation;
+    _localeCode = context.read<LocaleProvider>().locale.languageCode;
     setState(() {
       _isLandscape = orientation == Orientation.landscape;
     });
@@ -228,7 +232,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                'Rota el dispositivo a modo horizontal para usar fingerspelling',
+                AppTranslations.textStatic(_localeCode, 'rotateDevice'),
               ),
               duration: const Duration(seconds: 3),
               backgroundColor: Colors.orange,
@@ -240,7 +244,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _errorSubscription = _wsService.errorStream.listen((error) {
         if (!mounted) return;
         final translatedMessage = ErrorTranslator.translate(
-          error['message'] ?? 'Error desconocido',
+          error['message'] ??
+              AppTranslations.textStatic(_localeCode, 'errorUnknown'),
         );
         ScaffoldMessenger.of(
           context,
@@ -670,7 +675,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       onPressed: canTranslate ? _startTranslation : null,
       backgroundColor: Theme.of(context).colorScheme.primary,
       icon: const Icon(Icons.translate),
-      label: Text(canTranslate ? l('translateWord') : 'Gira el dispositivo'),
+      label: Text(canTranslate ? l('translateWord') : l('rotateDeviceButton')),
     );
   }
 
@@ -749,14 +754,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 color: Colors.orange,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.screen_rotation, color: Colors.white, size: 18),
-                  SizedBox(width: 4),
+                  const Icon(
+                    Icons.screen_rotation,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 4),
                   Text(
-                    'Landscape',
-                    style: TextStyle(
+                    AppTranslations.textStatic(_localeCode, 'landscape'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
