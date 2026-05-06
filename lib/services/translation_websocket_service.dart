@@ -212,7 +212,7 @@ class TranslationWebSocketService {
           debugPrint('[WebSocket] Parsing translation response...');
           final result = TranslationResult.fromJson(data);
           debugPrint(
-            '[WebSocket] Translation result: text="${result.text}", confidence=${result.confidence}',
+            '[WebSocket] Translation result: text="${result.text}", audio=${result.audio}, confidence=${result.confidence}',
           );
           _translationController.add(result);
           break;

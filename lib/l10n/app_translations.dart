@@ -112,7 +112,8 @@ class AppTranslations {
       'landscape': 'Horizontal',
       'errorUnknown': 'Error desconocido',
       'fingerspelling': 'Dactilología',
-      'handshapes': 'Señas',
+      'voiceEnabled': 'Voz activada',
+      'voiceDisabled': 'Voz desactivada',
     },
     'en': {
       'appTitle': 'LSC Translator',
@@ -220,7 +221,8 @@ class AppTranslations {
       'landscape': 'Landscape',
       'errorUnknown': 'Unknown error',
       'fingerspelling': 'Fingerspelling',
-      'handshapes': 'Signs',
+      'voiceEnabled': 'Voice enabled',
+      'voiceDisabled': 'Voice disabled',
     },
   };
 

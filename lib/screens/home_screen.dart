@@ -5,7 +5,7 @@ import 'package:camera/camera.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
 import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:provider/provider.dart';
-import 'package:flutter_tts/flutter_tts.dart';
+import '../services/tts_service.dart';
 import '../providers/auth_provider.dart';
 import '../providers/translation_mode_provider.dart';
 import '../providers/locale_provider.dart';
@@ -30,7 +30,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<CameraDescription>? _cameras;
   int _currentCameraIndex = 0;
   final TranslationWebSocketService _wsService = TranslationWebSocketService();
-  final FlutterTts _flutterTts = FlutterTts();
+  final TtsService _ttsService = TtsService();
 
   HandLandmarkerPlugin? _handDetector;
   int _frameCounter = 0;
@@ -90,11 +90,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   @override
-  void didChangeMetrics() {
-    _updateOrientation();
-  }
-
-  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _frameTimer?.cancel();
@@ -102,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _errorSubscription?.cancel();
     _connectionSubscription?.cancel();
     _wsService.dispose();
-    _flutterTts.stop();
+    _ttsService.stop();
     _cameraController?.dispose();
     _handDetector?.dispose();
     super.dispose();
@@ -120,17 +115,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     } catch (e) {
       debugPrint('[HomeScreen] Error initializing HandLandmarkerPlugin: $e');
       _isHandDetectorInitialized = false;
-    }
-  }
-
-  Future<void> _initializeTts() async {
-    try {
-      await _flutterTts.setLanguage('es-CO');
-      await _flutterTts.setSpeechRate(0.5);
-      await _flutterTts.setVolume(1.0);
-      await _flutterTts.setPitch(1.0);
-    } catch (e) {
-      debugPrint('Error initializing TTS: $e');
     }
   }
 
@@ -200,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
         // In fingerspelling mode, only show text when finalized
         if (result.mode == 'fingerspelling' && result.isFinalized == true) {
-          displayText = result.text;
+          displayText = result.text.replaceAll('"', '').trim();
           displayConfidence = result.confidence;
           debugPrint('[HomeScreen] Fingerspelling finalized: $displayText');
         } else {
@@ -223,7 +207,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           '[HomeScreen] Updated UI with translation: $displayText (confidence: ${displayConfidence.toStringAsFixed(2)})',
         );
         if (_isVoiceEnabled && displayText.isNotEmpty) {
-          _speak(displayText);
+          final cleanText = displayText.replaceAll('"', '').trim();
+          debugPrint('[HomeScreen] TTS text: $cleanText');
+          // Usar flutter_tts para reproducir texto
+          if (cleanText.isNotEmpty) {
+            _speakText(cleanText);
+          }
         }
 
         if (result.warning == 'rotate_camera') {
@@ -596,12 +585,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     debugPrint('[HomeScreen] Finalize request sent');
   }
 
-  Future<void> _speak(String text) async {
-    if (text.isEmpty) return;
+  Future<void> _speakText(String text) async {
+    if (!_ttsService.isEnabled || text.isEmpty) return;
     try {
-      await _flutterTts.speak(text);
+      debugPrint('[HomeScreen] Speaking: $text');
+      await _ttsService.speak(text);
     } catch (e) {
-      debugPrint('Error speaking text: $e');
+      debugPrint('Error speaking: $e');
+    }
+  }
+
+  Future<void> _initializeTts() async {
+    try {
+      await _ttsService.initialize(_localeCode);
+    } catch (e) {
+      debugPrint('Error initializing TTS: $e');
     }
   }
 
@@ -611,7 +609,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _errorSubscription?.cancel();
     _connectionSubscription?.cancel();
     await _wsService.disconnect();
-    await _flutterTts.stop();
+    await _ttsService.stop();
 
     if (mounted) {
       final authProvider = context.read<AuthProvider>();
@@ -641,6 +639,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           showLanguageSelector: true,
           toolbarHeight: kToolbarHeight - 5,
           actions: [
+            if (_cameras != null && _cameras!.length > 1)
+              IconButton(
+                icon: const Icon(Icons.flip_camera_ios, size: 20),
+                onPressed: _switchCamera,
+              ),
             IconButton(
               icon: const Icon(Icons.history, size: 20),
               onPressed: () {
@@ -665,21 +668,45 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 Expanded(
                   flex: 3,
-                  child: Container(
-                    margin: const EdgeInsets.fromLTRB(8, 2, 8, 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Theme.of(context).colorScheme.primary,
-                        width: 2,
+                  child: Stack(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 2,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child:
+                              _cameraController != null && _isCameraInitialized
+                              ? CameraPreview(_cameraController!)
+                              : const Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                        ),
                       ),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: _cameraController != null && _isCameraInitialized
-                          ? CameraPreview(_cameraController!)
-                          : const Center(child: CircularProgressIndicator()),
-                    ),
+                      if (_cameras != null && _cameras!.length > 1)
+                        Positioned(
+                          top: 8,
+                          right: 16,
+                          child: FloatingActionButton.small(
+                            heroTag: 'switch_camera',
+                            onPressed: _switchCamera,
+                            backgroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary.withOpacity(0.8),
+                            child: const Icon(
+                              Icons.flip_camera_ios,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -960,9 +987,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.volume_up),
-                  onPressed: () => _speak(_currentTranslation),
-                  color: Theme.of(context).colorScheme.primary,
+                  icon: Icon(
+                    _ttsService.isEnabled ? Icons.volume_up : Icons.volume_off,
+                  ),
+                  onPressed: () {
+                    _ttsService.toggle();
+                    setState(() {});
+                  },
+                  color: _ttsService.isEnabled
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.grey,
                 ),
               ],
             ),
