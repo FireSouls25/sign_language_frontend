@@ -8,7 +8,7 @@ import '../services/google_auth_service.dart';
 import '../services/deep_link_service.dart';
 import '../config/theme_config.dart';
 import 'register_screen.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 import 'language_select_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -232,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success && mounted) {
       Navigator.of(
         context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
     }
   }
 
@@ -243,7 +243,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await authProvider.loginWithOAuth(tokens);
       if (success && mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => const MainScreen()),
         );
       }
     });

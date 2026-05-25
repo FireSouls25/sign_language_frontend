@@ -4,7 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_translations.dart';
 import '../widgets/ls_app_bar.dart';
-import 'home_screen.dart';
+import 'main_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -47,7 +47,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (success && mounted) {
       Navigator.of(
         context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const HomeScreen()));
+      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
     }
   }
 
