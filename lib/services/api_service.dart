@@ -336,6 +336,20 @@ class ApiService {
     );
   }
 
+  Future<void> deleteConversation(String conversationId) async {
+    final response = await http.delete(
+      Uri.parse('${ApiConfig.baseUrl}/api/conversations/$conversationId'),
+      headers: await _headers,
+    );
+    if (response.statusCode != 204) {
+      final error = jsonDecode(response.body);
+      throw ApiException(
+        error['detail'] ?? 'Failed to delete conversation',
+        statusCode: response.statusCode,
+      );
+    }
+  }
+
   Future<MessageHistory> getMessages(
     String conversationId, {
     int page = 1,

@@ -18,6 +18,9 @@ class ChatProvider extends ChangeNotifier {
   List<ChatMessage> _messages = [];
   List<UserBrief> _searchResults = [];
   Map<String, dynamic>? _myId;
+  ConversationModel? _selfConversation;
+
+  double _fontSize = 16.0;
 
   bool _isLoadingConversations = false;
   bool _isLoadingContacts = false;
@@ -35,6 +38,8 @@ class ChatProvider extends ChangeNotifier {
   List<ChatMessage> get messages => _messages;
   List<UserBrief> get searchResults => _searchResults;
   Map<String, dynamic>? get myId => _myId;
+  ConversationModel? get selfConversation => _selfConversation;
+  double get fontSize => _fontSize;
   bool get isSignalConnected => _isSignalConnected;
 
   bool get isLoadingConversations => _isLoadingConversations;
@@ -42,6 +47,24 @@ class ChatProvider extends ChangeNotifier {
   bool get isLoadingMessages => _isLoadingMessages;
   bool get isSearching => _isSearching;
   String? get error => _error;
+
+  void setFontSize(double size) {
+    _fontSize = size;
+    notifyListeners();
+  }
+
+  Future<void> ensureSelfChat() async {
+    final id = _myId?['id'] as String?;
+    if (id == null) return;
+    if (_selfConversation != null) return;
+
+    try {
+      _selfConversation = await _apiService.createConversation(id);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('[ChatProvider] ensureSelfChat error: $e');
+    }
+  }
 
   void clearError() {
     _error = null;
@@ -116,9 +139,27 @@ class ChatProvider extends ChangeNotifier {
     try {
       await _apiService.removeContact(contactId);
       await loadContacts();
+
+      _conversations.removeWhere(
+        (c) => c.otherUser.id == contactId,
+      );
+      notifyListeners();
       return true;
     } catch (e) {
       _error = 'Failed to remove contact';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> removeConversation(String conversationId) async {
+    try {
+      await _apiService.deleteConversation(conversationId);
+      _conversations.removeWhere((c) => c.id == conversationId);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to delete conversation';
       notifyListeners();
       return false;
     }

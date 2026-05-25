@@ -98,7 +98,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
       if (allActions == null) {
         allActions = [toggleButton];
       } else {
-        allActions!.insert(0, toggleButton);
+        allActions.insert(0, toggleButton);
       }
     }
 

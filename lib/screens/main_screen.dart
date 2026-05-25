@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
 import 'chat_list_screen.dart';
-import 'home_screen.dart';
+import 'self_chat_screen.dart';
 import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -23,10 +23,10 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _screens = [
       const ChatListScreen(),
-      const HomeScreen(),
+      const SelfChatScreen(),
       const ProfileScreen(),
     ];
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
   }
 
   void _loadData() {

@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
 import '../models/chat.dart';
+import 'chat_detail_screen.dart';
+import 'contact_detail_screen.dart';
 
 class ContactListScreen extends StatefulWidget {
   const ContactListScreen({super.key});
@@ -107,7 +109,10 @@ class _ContactListScreenState extends State<ContactListScreen> {
                       final user = results[index];
                       return _UserSearchTile(
                         user: user,
-                        onTap: () async {
+                        isMyContact: chatProvider.contacts.any(
+                          (c) => c.contact.id == user.id,
+                        ),
+                        onChat: () async {
                           final myId = chatProvider.myId?['id'] as String?;
 
                           if (myId == user.id) {
@@ -122,9 +127,39 @@ class _ContactListScreenState extends State<ContactListScreen> {
                           );
                           if (conv != null && mounted) {
                             Navigator.of(context).pop();
-                            Navigator.of(context).pushNamed(
-                              '/chat',
-                              arguments: conv,
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChatDetailScreen(
+                                  conversation: conv,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        onAddContact: () async {
+                          final added = await chatProvider.addContact(user.id);
+                          if (added && mounted) {
+                            final conv = await chatProvider.createConversation(
+                              user.id,
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(l('contactAdded'))),
+                              );
+                              if (conv != null) {
+                                Navigator.of(context).pop();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatDetailScreen(
+                                      conversation: conv,
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
+                          } else if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(l('addContactError'))),
                             );
                           }
                         },
@@ -150,7 +185,7 @@ class _ContactListScreenState extends State<ContactListScreen> {
                           Icon(
                             Icons.people_outline,
                             size: 80,
-                            color: theme.colorScheme.primary.withOpacity(0.5),
+                            color: theme.colorScheme.primary.withValues(alpha: 0.5),
                           ),
                           const SizedBox(height: 24),
                           Text(
@@ -178,6 +213,15 @@ class _ContactListScreenState extends State<ContactListScreen> {
                         final contact = chatProvider.contacts[index];
                         return _ContactTile(
                           contact: contact,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ContactDetailScreen(
+                                  contact: contact,
+                                ),
+                              ),
+                            );
+                          },
                           onRemove: () async {
                             final confirmed = await showDialog<bool>(
                               context: context,
@@ -225,9 +269,16 @@ class _ContactListScreenState extends State<ContactListScreen> {
 
 class _UserSearchTile extends StatelessWidget {
   final UserBrief user;
-  final VoidCallback onTap;
+  final bool isMyContact;
+  final VoidCallback onChat;
+  final VoidCallback onAddContact;
 
-  const _UserSearchTile({required this.user, required this.onTap});
+  const _UserSearchTile({
+    required this.user,
+    required this.isMyContact,
+    required this.onChat,
+    required this.onAddContact,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -249,9 +300,20 @@ class _UserSearchTile extends StatelessWidget {
       ),
       title: Text(user.displayName),
       subtitle: Text('@${user.username}'),
-      trailing: IconButton(
-        icon: const Icon(Icons.chat_outlined),
-        onPressed: onTap,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!isMyContact)
+            IconButton(
+              icon: const Icon(Icons.person_add_outlined),
+              tooltip: 'Add contact',
+              onPressed: onAddContact,
+            ),
+          IconButton(
+            icon: const Icon(Icons.chat_outlined),
+            onPressed: onChat,
+          ),
+        ],
       ),
     );
   }
@@ -259,11 +321,13 @@ class _UserSearchTile extends StatelessWidget {
 
 class _ContactTile extends StatelessWidget {
   final ContactModel contact;
+  final VoidCallback onTap;
   final VoidCallback onRemove;
   final VoidCallback onChat;
 
   const _ContactTile({
     required this.contact,
+    required this.onTap,
     required this.onRemove,
     required this.onChat,
   });
@@ -315,7 +379,7 @@ class _ContactTile extends StatelessWidget {
           ),
         ],
       ),
-      onTap: onChat,
+      onTap: onTap,
     );
   }
 }

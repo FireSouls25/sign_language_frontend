@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:hand_landmarker/hand_landmarker.dart';
-import 'package:opencv_dart/opencv_dart.dart' as cv;
 import 'package:provider/provider.dart';
 import '../services/tts_service.dart';
 import '../providers/auth_provider.dart';
@@ -14,7 +13,6 @@ import '../services/translation_websocket_service.dart';
 import '../services/error_translator.dart';
 import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
-import 'login_screen.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 
@@ -397,92 +395,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return landmarks;
   }
 
-  Future<cv.Mat?> _convertCameraImageToMat(CameraImage image) async {
-    try {
-      final int width = image.width;
-      final int height = image.height;
-
-      if (image.planes.length == 1 &&
-          (image.planes[0].bytesPerPixel ?? 1) >= 4) {
-        final bytes = image.planes[0].bytes;
-        final stride = image.planes[0].bytesPerRow;
-        final matCols = stride ~/ 4;
-        final bgraOrRgba = cv.Mat.fromList(
-          height,
-          matCols,
-          cv.MatType.CV_8UC4,
-          bytes,
-        );
-        final cropped = matCols != width
-            ? bgraOrRgba.region(cv.Rect(0, 0, width, height))
-            : bgraOrRgba;
-        final bgr = cv.cvtColor(cropped, cv.COLOR_BGRA2BGR);
-        if (!identical(cropped, bgraOrRgba)) cropped.dispose();
-        bgraOrRgba.dispose();
-        return bgr;
-      }
-
-      final bgrBytes = Uint8List(width * height * 3);
-      final int yRowStride = image.planes[0].bytesPerRow;
-      final int yPixelStride = image.planes[0].bytesPerPixel ?? 1;
-
-      void writePixel(int x, int y, int yp, int up, int vp) {
-        int r = (yp + vp * 1436 / 1024 - 179).round().clamp(0, 255);
-        int g = (yp - up * 46549 / 131072 + 44 - vp * 93604 / 131072 + 91)
-            .round()
-            .clamp(0, 255);
-        int b = (yp + up * 1814 / 1024 - 227).round().clamp(0, 255);
-        final int bgrIdx = (y * width + x) * 3;
-        bgrBytes[bgrIdx] = b;
-        bgrBytes[bgrIdx + 1] = g;
-        bgrBytes[bgrIdx + 2] = r;
-      }
-
-      if (image.planes.length == 2) {
-        final int uvRowStride = image.planes[1].bytesPerRow;
-        final int uvPixelStride = image.planes[1].bytesPerPixel ?? 2;
-        for (int y = 0; y < height; y++) {
-          for (int x = 0; x < width; x++) {
-            final int uvIndex =
-                uvPixelStride * (x ~/ 2) + uvRowStride * (y ~/ 2);
-            final int index = y * yRowStride + x * yPixelStride;
-            writePixel(
-              x,
-              y,
-              image.planes[0].bytes[index],
-              image.planes[1].bytes[uvIndex],
-              image.planes[1].bytes[uvIndex + 1],
-            );
-          }
-        }
-      } else if (image.planes.length >= 3) {
-        final int uvRowStride = image.planes[1].bytesPerRow;
-        final int uvPixelStride = image.planes[1].bytesPerPixel ?? 1;
-        for (int y = 0; y < height; y++) {
-          for (int x = 0; x < width; x++) {
-            final int uvIndex =
-                uvPixelStride * (x ~/ 2) + uvRowStride * (y ~/ 2);
-            final int index = y * yRowStride + x * yPixelStride;
-            writePixel(
-              x,
-              y,
-              image.planes[0].bytes[index],
-              image.planes[1].bytes[uvIndex],
-              image.planes[2].bytes[uvIndex],
-            );
-          }
-        }
-      } else {
-        return null;
-      }
-
-      return cv.Mat.fromList(height, width, cv.MatType.CV_8UC3, bgrBytes);
-    } catch (e) {
-      debugPrint('[HomeScreen] Error converting CameraImage to Mat: $e');
-      return null;
-    }
-  }
-
   Future<List<int>?> _convertCameraImageToBytes(CameraImage image) async {
     try {
       final int width = image.width;
@@ -619,26 +531,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await _ttsService.initialize(_localeCode);
     } catch (e) {
       debugPrint('Error initializing TTS: $e');
-    }
-  }
-
-  Future<void> _logout() async {
-    _stopTranslation();
-    _translationSubscription?.cancel();
-    _errorSubscription?.cancel();
-    _connectionSubscription?.cancel();
-    await _wsService.disconnect();
-    await _ttsService.stop();
-
-    if (mounted) {
-      final authProvider = context.read<AuthProvider>();
-      await authProvider.logout();
-
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      }
     }
   }
 
@@ -919,18 +811,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
       ],
     );
-  }
-
-  Widget _buildModeSelector(String Function(String) l) {
-    return const SizedBox.shrink();
-  }
-
-  void _setSignMode(String mode) {
-    setState(() {
-      _signMode = mode;
-    });
-    _wsService.sendMode(mode);
-    _wsService.sendReset();
   }
 
   Widget _buildTranslationResult(String Function(String) l) {

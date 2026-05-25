@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/locale_provider.dart';
 import '../l10n/app_translations.dart';
 import '../widgets/ls_app_bar.dart';
 import 'main_screen.dart';

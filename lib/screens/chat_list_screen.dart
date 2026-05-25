@@ -5,6 +5,7 @@ import '../l10n/app_translations.dart';
 import '../models/chat.dart';
 import 'contact_list_screen.dart';
 import 'chat_detail_screen.dart';
+import 'language_select_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -33,15 +34,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.people_outline),
+            icon: const Icon(Icons.translate),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => const ContactListScreen(),
+                  builder: (_) => const LanguageSelectScreen(),
                 ),
               );
             },
-            tooltip: l('contacts'),
+            tooltip: l('selectLanguage'),
           ),
         ],
       ),
@@ -61,7 +62,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                     Icon(
                       Icons.chat_bubble_outline,
                       size: 80,
-                      color: theme.colorScheme.primary.withOpacity(0.5),
+                      color: theme.colorScheme.primary.withValues(alpha: 0.5),
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -100,6 +101,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
                       ),
                     );
                   },
+                  onDelete: () {
+                    _confirmDeleteConversation(context, conv, l);
+                  },
                 );
               },
             ),
@@ -118,15 +122,47 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
     );
   }
+
+  void _confirmDeleteConversation(
+    BuildContext context,
+    ConversationModel conv,
+    String Function(String) l,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(l('deleteConversation')),
+        content: Text('${l('deleteConversationConfirm')} ${conv.otherUser.displayName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(l('cancel')),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<ChatProvider>().removeConversation(conv.id);
+            },
+            child: Text(
+              l('delete'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ConversationTile extends StatelessWidget {
   final ConversationModel conversation;
   final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   const _ConversationTile({
     required this.conversation,
     required this.onTap,
+    required this.onDelete,
   });
 
   @override
@@ -164,14 +200,29 @@ class _ConversationTile extends StatelessWidget {
               ),
             )
           : null,
-      trailing: conversation.lastMessageAt != null
-          ? Text(
-              _formatTime(conversation.lastMessageAt!),
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (conversation.lastMessageAt != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                _formatTime(conversation.lastMessageAt!),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            )
-          : null,
+            ),
+          IconButton(
+            icon: Icon(
+              Icons.delete_outline,
+              color: theme.colorScheme.error,
+            ),
+            onPressed: onDelete,
+            tooltip: AppTranslations.text(context, 'deleteConversation'),
+          ),
+        ],
+      ),
       onTap: onTap,
     );
   }

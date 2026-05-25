@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
-import '../providers/theme_provider.dart';
-import '../providers/translation_mode_provider.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
-import 'logs_screen.dart';
 import 'login_screen.dart';
+import 'visual_settings_screen.dart';
+import 'preferences_screen.dart';
+import 'chat_settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -25,8 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l('myProfile')),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        centerTitle: true,
       ),
       body: user == null
           ? const Center(child: CircularProgressIndicator())
@@ -63,107 +62,50 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildSectionTitle(l('personalInfo')),
                   _buildInfoTile(Icons.email, l('email'), user.email),
                   const SizedBox(height: 24),
-                  _buildSectionTitle(l('appSettings')),
-                  SwitchListTile(
-                    title: Text(l('darkMode')),
-                    subtitle: Text(l('changeTheme')),
-                    value: context.watch<ThemeProvider>().isDarkMode,
-                    activeColor: Theme.of(context).colorScheme.primary,
-                    onChanged: (bool value) {
-                      context.read<ThemeProvider>().toggleTheme(value);
-                    },
-                    secondary: const Icon(Icons.dark_mode),
-                  ),
-                  const SizedBox(height: 8),
-                  SwitchListTile(
-                    title: Text(l('themeButtonInAppBar')),
-                    subtitle: Text(l('themeButtonInAppBarDesc')),
-                    value: context.watch<ThemeProvider>().showAppBarToggle,
-                    activeColor: Theme.of(context).colorScheme.primary,
-                    onChanged: (bool value) {
-                      context.read<ThemeProvider>().setShowAppBarToggle(value);
-                    },
-                    secondary: Icon(
-                      Icons.app_settings_alt,
-                      color: AppTheme.getIconPrimary(context),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      l('accentColor'),
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildColorOption(
-                          context,
-                          Colors.deepPurple,
-                          l('purple'),
-                        ),
-                        _buildColorOption(context, Colors.blue, l('blue')),
-                        _buildColorOption(context, Colors.teal, l('green')),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SwitchListTile(
-                    title: Text(l('voiceOutput')),
-                    subtitle: Text(l('voiceOutputDesc')),
-                    value: authProvider.isVoiceEnabled,
-                    activeColor: Theme.of(context).colorScheme.primary,
-                    onChanged: (bool value) {
-                      authProvider.toggleVoice(value);
-                    },
-                    secondary: const Icon(Icons.volume_up),
-                  ),
-                  const SizedBox(height: 8),
+                  _buildSectionTitle(l('settings')),
                   ListTile(
                     leading: Icon(
-                      Icons.camera_alt,
+                      Icons.palette_outlined,
                       color: AppTheme.getIconPrimary(context),
                     ),
-                    title: Text(l('inputMode')),
-                    subtitle: Text(
-                      context.watch<TranslationModeProvider>().isFrameMode
-                          ? l('sendFrames')
-                          : l('sendLandmarks'),
-                    ),
-                    trailing: Switch(
-                      value: context
-                          .watch<TranslationModeProvider>()
-                          .isFrameMode,
-                      activeColor: Theme.of(context).colorScheme.primary,
-                      onChanged: (bool value) {
-                        context.read<TranslationModeProvider>().setInputMode(
-                          value
-                              ? TranslationInputMode.frames
-                              : TranslationInputMode.landmarks,
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ListTile(
-                    leading: Icon(
-                      Icons.bug_report,
-                      color: AppTheme.getIconPrimary(context),
-                    ),
-                    title: Text(l('systemLogs')),
-                    subtitle: Text(l('systemLogsDesc')),
+                    title: Text(l('visualSettings')),
+                    subtitle: Text(l('visualSettingsDesc')),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const LogsScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const VisualSettingsScreen(),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.tune,
+                      color: AppTheme.getIconPrimary(context),
+                    ),
+                    title: Text(l('preferences')),
+                    subtitle: Text(l('preferencesDesc')),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PreferencesScreen(),
+                      ),
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(
+                      Icons.chat_outlined,
+                      color: AppTheme.getIconPrimary(context),
+                    ),
+                    title: Text(l('chatSettings')),
+                    subtitle: Text(l('chatSettingsDesc')),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatSettingsScreen(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -361,38 +303,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildColorOption(BuildContext context, Color color, String label) {
-    final themeProvider = context.watch<ThemeProvider>();
-    final isSelected = themeProvider.seedColor.value == color.value;
-
-    return GestureDetector(
-      onTap: () => themeProvider.setSeedColor(color),
-      child: Column(
-        children: [
-          Container(
-            width: 35,
-            height: 35,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: isSelected
-                  ? Border.all(
-                      color: Theme.of(context).colorScheme.outline,
-                      width: 2,
-                    )
-                  : null,
-            ),
-            child: isSelected
-                ? const Icon(Icons.check, color: Colors.white, size: 18)
-                : null,
-          ),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(fontSize: 10)),
-        ],
       ),
     );
   }

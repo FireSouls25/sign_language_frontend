@@ -14,8 +14,13 @@ import '../services/webrtc_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ConversationModel conversation;
+  final bool isSelfChat;
 
-  const ChatDetailScreen({super.key, required this.conversation});
+  const ChatDetailScreen({
+    super.key,
+    required this.conversation,
+    this.isSelfChat = false,
+  });
 
   @override
   State<ChatDetailScreen> createState() => _ChatDetailScreenState();
@@ -29,6 +34,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
+  int _currentCameraIndex = 0;
   HandLandmarkerPlugin? _handDetector;
   bool _isHandDetectorInitialized = false;
   bool _isCameraInitialized = false;
@@ -54,7 +60,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _initRenderers();
+    if (!widget.isSelfChat) {
+      _initRenderers();
+    }
     _initChat();
     _initCamera();
     _initHandDetector();
@@ -79,7 +87,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     }
 
     await _initTranslateWs();
-    _initSignaling();
+    if (!widget.isSelfChat) {
+      _initSignaling();
+    }
   }
 
   Future<void> _initTranslateWs() async {
@@ -208,7 +218,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await _cameraController!.dispose();
     }
     if (_cameras == null || _cameras!.isEmpty) return;
+    if (index >= _cameras!.length) return;
 
+    _currentCameraIndex = index;
     _cameraController = CameraController(
       _cameras![index],
       ResolutionPreset.medium,
@@ -221,6 +233,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         setState(() => _isCameraInitialized = true);
       }
     } catch (_) {}
+  }
+
+  void _switchCamera() {
+    if (_cameras == null || _cameras!.length < 2) return;
+    final next = (_currentCameraIndex + 1) % _cameras!.length;
+    _setupCamera(next);
   }
 
   void _startTranslation() {
@@ -314,9 +332,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _callStateSub?.cancel();
     _remoteStreamSub?.cancel();
     _translateWs.dispose();
-    _webrtc.dispose();
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
+    if (!widget.isSelfChat) {
+      _webrtc.dispose();
+      _localRenderer.dispose();
+      _remoteRenderer.dispose();
+    }
     _messageController.dispose();
     _scrollController.dispose();
     context.read<ChatProvider>().disconnectSignal();
@@ -328,54 +348,114 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final l = (String key) => AppTranslations.text(context, key);
     final theme = Theme.of(context);
     final other = widget.conversation.otherUser;
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (!isLandscape) {
+      return Scaffold(
+        appBar: widget.isSelfChat
+            ? AppBar(title: Text(l('selfChat')), centerTitle: true)
+            : AppBar(
+                title: Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: theme.colorScheme.primaryContainer,
+                      child: Text(
+                        (other.displayName.isNotEmpty
+                                ? other.displayName[0]
+                                : other.username[0])
+                            .toUpperCase(),
+                        style: TextStyle(
+                          color: theme.colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(other.displayName, style: const TextStyle(fontSize: 16)),
+                  ],
+                ),
+                centerTitle: false,
+                actions: widget.isSelfChat
+                    ? null
+                    : [
+                        IconButton(
+                          icon: const Icon(Icons.videocam),
+                          onPressed: _startVideoCall,
+                          tooltip: l('videoCall'),
+                        ),
+                      ],
+              ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.screen_rotation, size: 80, color: Colors.orange),
+              const SizedBox(height: 24),
+              Text(
+                l('rotateDevice'),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.titleMedium,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                l('landscape'),
+                style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Text(
-                (other.displayName.isNotEmpty
-                        ? other.displayName[0]
-                        : other.username[0])
-                    .toUpperCase(),
-                style: TextStyle(
-                  color: theme.colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(other.displayName, style: const TextStyle(fontSize: 16)),
-                Text(
-                  _isVideoCall ? l('onCall') : '@${other.username}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: _isVideoCall
-                        ? Colors.green
-                        : theme.colorScheme.onSurfaceVariant,
+      appBar: widget.isSelfChat
+          ? AppBar(title: Text(l('selfChat')), centerTitle: true)
+          : AppBar(
+              title: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: theme.colorScheme.primaryContainer,
+                    child: Text(
+                      (other.displayName.isNotEmpty
+                              ? other.displayName[0]
+                              : other.username[0])
+                          .toUpperCase(),
+                      style: TextStyle(
+                        color: theme.colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(other.displayName, style: const TextStyle(fontSize: 16)),
+                      Text(
+                        _isVideoCall ? l('onCall') : '@${other.username}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: _isVideoCall
+                              ? Colors.green
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              centerTitle: false,
+              actions: widget.isSelfChat
+                  ? null
+                  : [
+                      IconButton(
+                        icon: Icon(_isVideoCall ? Icons.call_end : Icons.videocam),
+                        color: _isVideoCall ? Colors.red : null,
+                        onPressed: _isVideoCall ? _endVideoCall : _startVideoCall,
+                        tooltip: _isVideoCall ? l('endCall') : l('videoCall'),
+                      ),
+                    ],
             ),
-          ],
-        ),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: Icon(_isVideoCall ? Icons.call_end : Icons.videocam),
-            color: _isVideoCall ? Colors.red : null,
-            onPressed: _isVideoCall
-                ? _endVideoCall
-                : _startVideoCall,
-            tooltip: _isVideoCall ? l('endCall') : l('videoCall'),
-          ),
-        ],
-      ),
-      body: Column(
+      body: Row(
         children: [
           Expanded(child: _buildCameraArea(l, theme, other)),
           _buildMessagePanel(l, theme),
@@ -389,7 +469,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     ThemeData theme,
     UserBrief other,
   ) {
-    if (_isVideoCall) {
+    if (!widget.isSelfChat && _isVideoCall) {
       return _buildVideoCallView(theme, other);
     }
     return _buildTranslationView(l, theme);
@@ -421,11 +501,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
           ),
         Positioned(
-          right: 12,
-          top: 12,
+          right: 12, top: 12,
           child: Container(
-            width: 100,
-            height: 140,
+            width: 100, height: 140,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white, width: 2),
@@ -443,9 +521,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           ),
         ),
         Positioned(
-          bottom: 16,
-          left: 0,
-          right: 0,
+          bottom: 16, left: 0, right: 0,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -459,8 +535,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
               const SizedBox(width: 16),
               _CallControlButton(
-                icon: Icons.call_end,
-                color: Colors.red,
+                icon: Icons.call_end, color: Colors.red,
                 onPressed: _endVideoCall,
               ),
               const SizedBox(width: 16),
@@ -474,8 +549,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               ),
               const SizedBox(width: 16),
               _CallControlButton(
-                icon: Icons.flip_camera_ios,
-                color: Colors.white,
+                icon: Icons.flip_camera_ios, color: Colors.white,
                 onPressed: () => _webrtc.switchCamera(),
               ),
             ],
@@ -506,6 +580,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       Text(l('startTranslating'),
                           style: theme.textTheme.bodyMedium),
                     ],
+                  ),
+                ),
+              if (_cameras != null && _cameras!.length > 1)
+                Positioned(
+                  top: 8, right: 8,
+                  child: FloatingActionButton.small(
+                    heroTag: null,
+                    onPressed: _switchCamera,
+                    backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.8),
+                    child: const Icon(Icons.flip_camera_ios,
+                        color: Colors.white, size: 20),
                   ),
                 ),
               if (_currentTranslation.isNotEmpty)
@@ -600,17 +685,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
   Widget _buildMessagePanel(String Function(String) l, ThemeData theme) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.45,
+      width: MediaQuery.of(context).size.width * 0.5,
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        border: Border(
+          left: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: Column(
         children: [
@@ -676,44 +756,45 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               },
             ),
           ),
-          Container(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              border: Border(
-                top: BorderSide(color: theme.colorScheme.outlineVariant),
+          if (!widget.isSelfChat)
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                border: Border(
+                  top: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+              ),
+              padding: EdgeInsets.fromLTRB(
+                12, 8, 12, MediaQuery.of(context).padding.bottom + 8,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: l('typeMessage'),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10,
+                        ),
+                        filled: true,
+                        fillColor: theme.colorScheme.surfaceContainerHighest,
+                      ),
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendTextMessage(),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    onPressed: _sendTextMessage,
+                    icon: const Icon(Icons.send),
+                  ),
+                ],
               ),
             ),
-            padding: EdgeInsets.fromLTRB(
-              12, 8, 12, MediaQuery.of(context).padding.bottom + 8,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: l('typeMessage'),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10,
-                      ),
-                      filled: true,
-                      fillColor: theme.colorScheme.surfaceContainerHighest,
-                    ),
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _sendTextMessage(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: _sendTextMessage,
-                  icon: const Icon(Icons.send),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -761,7 +842,7 @@ class _MessageBubble extends StatelessWidget {
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.78,
+                maxWidth: MediaQuery.of(context).size.width * 0.4,
               ),
               padding: const EdgeInsets.symmetric(
                 horizontal: 14, vertical: 8,
