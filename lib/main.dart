@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:app_links/app_links.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'config/api_config.dart';
 import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
@@ -21,7 +21,12 @@ class EnvVars {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await _loadEnvFromAssets();
+  await dotenv.load();
+
+  EnvVars.backendUrl = dotenv.env['BACKEND_URL'] ?? EnvVars.backendUrl;
+  EnvVars.backendWsUrl = dotenv.env['BACKEND_WS_URL'] ?? EnvVars.backendWsUrl;
+
+  debugPrint('[main] Loaded env: BACKEND_URL=${EnvVars.backendUrl}');
 
   FlutterError.onError = (FlutterErrorDetails details) {
     ErrorTranslator.saveUnhandledError(
@@ -31,30 +36,6 @@ Future<void> main() async {
   };
 
   runApp(const LSCTranslatorApp());
-}
-
-Future<void> _loadEnvFromAssets() async {
-  try {
-    final content = await rootBundle.loadString('.env');
-    final lines = content.split('\n');
-    for (var line in lines) {
-      line = line.trim();
-      if (line.isEmpty || line.startsWith('#')) continue;
-      final parts = line.split('=');
-      if (parts.length == 2) {
-        final key = parts[0].trim();
-        final value = parts[1].trim();
-        if (key == 'BACKEND_URL') {
-          EnvVars.backendUrl = value;
-        } else if (key == 'BACKEND_WS_URL') {
-          EnvVars.backendWsUrl = value;
-        }
-      }
-    }
-    debugPrint('[main] Loaded env: BACKEND_URL=${EnvVars.backendUrl}');
-  } catch (e) {
-    debugPrint('[main] Could not load .env, using defaults: $e');
-  }
 }
 
 class LSCTranslatorApp extends StatefulWidget {

@@ -208,8 +208,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         );
         if (_isVoiceEnabled && displayText.isNotEmpty) {
           final cleanText = displayText.replaceAll('"', '').trim();
-          debugPrint('[HomeScreen] TTS text: $cleanText');
-          // Usar flutter_tts para reproducir texto
+          debugPrint(
+            '[HomeScreen] TTS check: voiceEnabled=$_isVoiceEnabled, text="$cleanText"',
+          );
           if (cleanText.isNotEmpty) {
             _speakText(cleanText);
           }
@@ -230,10 +231,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       _errorSubscription = _wsService.errorStream.listen((error) {
         if (!mounted) return;
-        final translatedMessage = ErrorTranslator.translate(
-          error['message'] ??
-              AppTranslations.textStatic(_localeCode, 'errorUnknown'),
-        );
+        final errorMsg = error['message'] ?? '';
+        final errorCode = error['code'] ?? '';
+
+        if (errorCode == 'AUTH_ERROR' ||
+            errorMsg.toLowerCase().contains('token') ||
+            errorMsg.toLowerCase().contains('auth') ||
+            errorMsg.toLowerCase().contains('unauthorized')) {
+          debugPrint('[HomeScreen] Auth error detected in WS, logging out');
+          context.read<AuthProvider>().logout();
+          return;
+        }
+
+        final translatedMessage = ErrorTranslator.translate(errorMsg);
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(translatedMessage)));
@@ -247,6 +257,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
     } catch (e) {
       if (mounted) {
+        final errStr = e.toString().toLowerCase();
+        if (errStr.contains('401') ||
+            errStr.contains('unauthorized') ||
+            errStr.contains('token') ||
+            errStr.contains('auth')) {
+          debugPrint('[HomeScreen] Auth error in WS connection, logging out');
+          context.read<AuthProvider>().logout();
+          return;
+        }
         final translatedMessage = ErrorTranslator.translate(e);
         ScaffoldMessenger.of(
           context,
@@ -1001,7 +1020,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ],
             ),
           ],
-          const SizedBox(height: 80),
+          SizedBox(height: isCompact ? 4 : MediaQuery.of(context).padding.bottom),
         ],
       ),
     );

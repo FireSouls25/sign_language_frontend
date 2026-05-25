@@ -40,17 +40,22 @@ dependencies:
   json_annotation: ^4.8.0
   provider: ^6.1.0
   url_launcher: ^6.2.0
-  flutter_tts: ^4.2.5
+  piper_tts_plugin:
+    git:
+      url: https://github.com/dev-6768/piper_tts_plugin.git
+      ref: dev-6768-v0.0.2
   app_links: ^6.0.0
   flutter_custom_tabs: ^2.0.0
   just_audio: ^0.9.42
   flutter_secure_storage: ^9.2.4
   sqflite: ^2.4.1
+  path_provider: ^2.1.0
   path: ^1.9.0
   hand_landmarker: ^2.2.0
   pose_detection: ^2.0.7
   opencv_dart: ^2.2.1+4
   intl: ^0.20.2
+  flutter_dotenv: ^5.2.1
 
 dev_dependencies:
   flutter_test:
@@ -74,6 +79,7 @@ flutter:
 
   assets:
     - .env
+    - assets/piper_models/es_ES/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
