@@ -22,6 +22,11 @@ class ApiConfig {
     return '$wsUrl?token=$token';
   }
 
+  static String buildSignalWsUrl(String conversationId, String token) {
+    final base = EnvVars.backendWsUrl;
+    return '$base/ws/signal/$conversationId?token=$token';
+  }
+
   static String getOAuthRedirectUrl(String provider) {
     if (_environment == Environment.development) {
       return '$baseUrl/api/auth/callback-dev/$provider';

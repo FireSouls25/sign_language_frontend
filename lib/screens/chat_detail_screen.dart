@@ -1,0 +1,827 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:camera/camera.dart';
+import 'package:hand_landmarker/hand_landmarker.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:provider/provider.dart';
+import '../providers/chat_provider.dart';
+import '../providers/auth_provider.dart';
+import '../l10n/app_translations.dart';
+import '../models/chat.dart';
+import '../services/translation_websocket_service.dart';
+import '../services/webrtc_service.dart';
+
+class ChatDetailScreen extends StatefulWidget {
+  final ConversationModel conversation;
+
+  const ChatDetailScreen({super.key, required this.conversation});
+
+  @override
+  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
+}
+
+class _ChatDetailScreenState extends State<ChatDetailScreen> {
+  final _messageController = TextEditingController();
+  final _scrollController = ScrollController();
+  final TranslationWebSocketService _translateWs = TranslationWebSocketService();
+  final WebRTCService _webrtc = WebRTCService();
+
+  CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
+  HandLandmarkerPlugin? _handDetector;
+  bool _isHandDetectorInitialized = false;
+  bool _isCameraInitialized = false;
+  bool _isTranslating = false;
+  String _currentTranslation = '';
+  double _confidence = 0.0;
+  int _frameCounter = 0;
+  static const int _framesToProcess = 3;
+  Timer? _frameTimer;
+  StreamSubscription? _translationSub;
+  StreamSubscription? _errorSub;
+  StreamSubscription? _signalingSub;
+  StreamSubscription<CallState>? _callStateSub;
+  StreamSubscription<MediaStream?>? _remoteStreamSub;
+
+  bool _isVideoCall = false;
+  bool _isMicEnabled = true;
+  bool _isCameraEnabled = true;
+
+  final _localRenderer = RTCVideoRenderer();
+  final _remoteRenderer = RTCVideoRenderer();
+
+  @override
+  void initState() {
+    super.initState();
+    _initRenderers();
+    _initChat();
+    _initCamera();
+    _initHandDetector();
+  }
+
+  Future<void> _initRenderers() async {
+    await _localRenderer.initialize();
+    await _remoteRenderer.initialize();
+  }
+
+  Future<void> _initChat() async {
+    final chatProvider = context.read<ChatProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    await chatProvider.loadMessages(widget.conversation.id);
+
+    if (authProvider.accessToken != null) {
+      chatProvider.connectSignal(
+        widget.conversation.id,
+        authProvider.accessToken!,
+      );
+    }
+
+    await _initTranslateWs();
+    _initSignaling();
+  }
+
+  Future<void> _initTranslateWs() async {
+    final authProvider = context.read<AuthProvider>();
+    try {
+      await _translateWs.connect(token: authProvider.accessToken);
+
+      _translationSub = _translateWs.translationStream.listen((result) {
+        if (!mounted) return;
+        String text = '';
+        if (result.isFinalized) {
+          text = result.text.replaceAll('"', '').trim();
+        }
+        if (text.isNotEmpty) {
+          setState(() {
+            _currentTranslation = text;
+            _confidence = result.confidence;
+          });
+          HapticFeedback.lightImpact();
+        }
+      });
+
+      _errorSub = _translateWs.errorStream.listen((error) {
+        final msg = error['message'] ?? '';
+        if (msg.toLowerCase().contains('token') ||
+            msg.toLowerCase().contains('auth')) {
+          context.read<AuthProvider>().logout();
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _initSignaling() {
+    final chatProvider = context.read<ChatProvider>();
+
+    _signalingSub = chatProvider.signalWs.signalingStream.listen((data) {
+      final type = data['type'] as String?;
+      final fromId = data['from_id'] as String?;
+
+      if (fromId == null) return;
+
+      switch (type) {
+        case 'offer':
+          _webrtc.handleOffer(data);
+          break;
+        case 'answer':
+          _webrtc.handleAnswer(data);
+          break;
+        case 'ice_candidate':
+          _webrtc.handleIceCandidate(data);
+          break;
+      }
+    });
+  }
+
+  void _initWebRTC() {
+    final chatProvider = context.read<ChatProvider>();
+    final otherId = widget.conversation.otherUser.id;
+
+    _webrtc.initialize(
+      signalWs: chatProvider.signalWs,
+      otherUserId: otherId,
+    );
+
+    _callStateSub = _webrtc.callStateStream.listen((state) {
+      if (!mounted) return;
+      if (state == CallState.disconnected) {
+        setState(() => _isVideoCall = false);
+      }
+    });
+
+    _remoteStreamSub = _webrtc.remoteStreamStream.listen((stream) {
+      if (!mounted) return;
+      if (stream != null) {
+        _remoteRenderer.srcObject = stream;
+      }
+    });
+  }
+
+  Future<void> _startVideoCall() async {
+    _initWebRTC();
+    final success = await _webrtc.startCall();
+    if (mounted && success) {
+      setState(() {
+        _isVideoCall = true;
+        _localRenderer.srcObject = _webrtc.localStream;
+      });
+    }
+  }
+
+  Future<void> _endVideoCall() async {
+    await _webrtc.endCall();
+    if (mounted) {
+      setState(() {
+        _isVideoCall = false;
+        _localRenderer.srcObject = null;
+        _remoteRenderer.srcObject = null;
+      });
+    }
+  }
+
+  Future<void> _initHandDetector() async {
+    try {
+      _handDetector = HandLandmarkerPlugin.create(
+        numHands: 2,
+        minHandDetectionConfidence: 0.7,
+        delegate: HandLandmarkerDelegate.gpu,
+      );
+      _isHandDetectorInitialized = true;
+    } catch (_) {
+      _isHandDetectorInitialized = false;
+    }
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras != null && _cameras!.isNotEmpty) {
+        await _setupCamera(0);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _setupCamera(int index) async {
+    if (_cameraController != null) {
+      await _cameraController!.dispose();
+    }
+    if (_cameras == null || _cameras!.isEmpty) return;
+
+    _cameraController = CameraController(
+      _cameras![index],
+      ResolutionPreset.medium,
+      imageFormatGroup: ImageFormatGroup.yuv420,
+    );
+
+    try {
+      await _cameraController!.initialize();
+      if (mounted) {
+        setState(() => _isCameraInitialized = true);
+      }
+    } catch (_) {}
+  }
+
+  void _startTranslation() {
+    if (_cameraController == null || !_isCameraInitialized) return;
+
+    setState(() {
+      _isTranslating = true;
+      _currentTranslation = '';
+      _confidence = 0.0;
+    });
+
+    _cameraController!.startImageStream((CameraImage image) async {
+      if (!_translateWs.isConnected || _cameraController == null) return;
+
+      _frameCounter++;
+      if (_frameCounter >= _framesToProcess &&
+          _isHandDetectorInitialized && _handDetector != null) {
+        _frameCounter = 0;
+        final landmarks = await _processImageForLandmarks(image);
+        if (landmarks['left_hand'] != null ||
+            landmarks['right_hand'] != null) {
+          _translateWs.sendLandmarks(landmarks, mode: 'fingerspelling');
+        }
+      }
+    });
+  }
+
+  Future<Map<String, List<List<double>>>> _processImageForLandmarks(
+    CameraImage image,
+  ) async {
+    final landmarks = <String, List<List<double>>>{};
+    if (_handDetector == null || !_isHandDetectorInitialized) return landmarks;
+    try {
+      final sensorOrientation =
+          _cameraController?.description.sensorOrientation ?? 0;
+      final hands = _handDetector!.detect(image, sensorOrientation);
+      if (hands.isNotEmpty) {
+        for (final hand in hands) {
+          final handLandmarks = hand.landmarks
+              .map<List<double>>(
+                  (point) => <double>[point.x, point.y, point.z])
+              .toList();
+          final wristX = hand.landmarks[0].x;
+          if (wristX > 0.5) {
+            landmarks['right_hand'] = handLandmarks;
+          } else {
+            landmarks['left_hand'] = handLandmarks;
+          }
+        }
+      }
+    } catch (_) {}
+    return landmarks;
+  }
+
+  void _stopTranslation() {
+    _cameraController?.stopImageStream();
+    _frameTimer?.cancel();
+    _frameCounter = 0;
+    if (_translateWs.isConnected) _translateWs.sendReset();
+    setState(() => _isTranslating = false);
+  }
+
+  void _finalizeTranslation() {
+    _cameraController?.stopImageStream();
+    _frameTimer?.cancel();
+    _frameCounter = 0;
+    setState(() => _isTranslating = false);
+    if (_translateWs.isConnected) _translateWs.sendFinalize();
+  }
+
+  void _sendTextMessage() {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) return;
+
+    context.read<ChatProvider>().sendMessage(
+          widget.conversation.id,
+          text: text,
+        );
+    _messageController.clear();
+  }
+
+  @override
+  void dispose() {
+    _cameraController?.stopImageStream();
+    _cameraController?.dispose();
+    _handDetector?.dispose();
+    _frameTimer?.cancel();
+    _translationSub?.cancel();
+    _errorSub?.cancel();
+    _signalingSub?.cancel();
+    _callStateSub?.cancel();
+    _remoteStreamSub?.cancel();
+    _translateWs.dispose();
+    _webrtc.dispose();
+    _localRenderer.dispose();
+    _remoteRenderer.dispose();
+    _messageController.dispose();
+    _scrollController.dispose();
+    context.read<ChatProvider>().disconnectSignal();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = (String key) => AppTranslations.text(context, key);
+    final theme = Theme.of(context);
+    final other = widget.conversation.otherUser;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: theme.colorScheme.primaryContainer,
+              child: Text(
+                (other.displayName.isNotEmpty
+                        ? other.displayName[0]
+                        : other.username[0])
+                    .toUpperCase(),
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(other.displayName, style: const TextStyle(fontSize: 16)),
+                Text(
+                  _isVideoCall ? l('onCall') : '@${other.username}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: _isVideoCall
+                        ? Colors.green
+                        : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        centerTitle: false,
+        actions: [
+          IconButton(
+            icon: Icon(_isVideoCall ? Icons.call_end : Icons.videocam),
+            color: _isVideoCall ? Colors.red : null,
+            onPressed: _isVideoCall
+                ? _endVideoCall
+                : _startVideoCall,
+            tooltip: _isVideoCall ? l('endCall') : l('videoCall'),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(child: _buildCameraArea(l, theme, other)),
+          _buildMessagePanel(l, theme),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCameraArea(
+    String Function(String) l,
+    ThemeData theme,
+    UserBrief other,
+  ) {
+    if (_isVideoCall) {
+      return _buildVideoCallView(theme, other);
+    }
+    return _buildTranslationView(l, theme);
+  }
+
+  Widget _buildVideoCallView(ThemeData theme, UserBrief other) {
+    return Stack(
+      children: [
+        if (_remoteRenderer.srcObject != null)
+          RTCVideoView(
+            _remoteRenderer,
+            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            mirror: false,
+          )
+        else
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(
+                  'Connecting...',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Positioned(
+          right: 12,
+          top: 12,
+          child: Container(
+            width: 100,
+            height: 140,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: _localRenderer.srcObject != null
+                  ? RTCVideoView(
+                      _localRenderer,
+                      objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+                      mirror: true,
+                    )
+                  : Container(color: Colors.black),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 16,
+          left: 0,
+          right: 0,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _CallControlButton(
+                icon: _isMicEnabled ? Icons.mic : Icons.mic_off,
+                color: _isMicEnabled ? Colors.white : Colors.red,
+                onPressed: () async {
+                  await _webrtc.toggleMic();
+                  setState(() => _isMicEnabled = !_isMicEnabled);
+                },
+              ),
+              const SizedBox(width: 16),
+              _CallControlButton(
+                icon: Icons.call_end,
+                color: Colors.red,
+                onPressed: _endVideoCall,
+              ),
+              const SizedBox(width: 16),
+              _CallControlButton(
+                icon: _isCameraEnabled ? Icons.videocam : Icons.videocam_off,
+                color: _isCameraEnabled ? Colors.white : Colors.red,
+                onPressed: () async {
+                  await _webrtc.toggleCamera();
+                  setState(() => _isCameraEnabled = !_isCameraEnabled);
+                },
+              ),
+              const SizedBox(width: 16),
+              _CallControlButton(
+                icon: Icons.flip_camera_ios,
+                color: Colors.white,
+                onPressed: () => _webrtc.switchCamera(),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTranslationView(String Function(String) l, ThemeData theme) {
+    return Column(
+      children: [
+        Expanded(
+          child: Stack(
+            children: [
+              if (_isCameraInitialized && _cameraController != null)
+                ClipRRect(
+                  child: CameraPreview(_cameraController!),
+                )
+              else
+                Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.videocam_off, size: 48,
+                          color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 8),
+                      Text(l('startTranslating'),
+                          style: theme.textTheme.bodyMedium),
+                    ],
+                  ),
+                ),
+              if (_currentTranslation.isNotEmpty)
+                Positioned(
+                  bottom: 0, left: 0, right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withValues(alpha: 0.7),
+                        ],
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_currentTranslation,
+                          style: const TextStyle(
+                            color: Colors.white, fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${(_confidence * 100).toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            color: _confidence >= 0.7
+                                ? Colors.greenAccent
+                                : Colors.orangeAccent,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (_isTranslating)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _stopTranslation,
+                    icon: const Icon(Icons.close, size: 18),
+                    label: Text(l('cancelTranslating')),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.grey,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _finalizeTranslation,
+                    icon: const Icon(Icons.check, size: 18),
+                    label: Text(l('finalizeTranslating')),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: theme.colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _startTranslation,
+                icon: const Icon(Icons.translate, size: 18),
+                label: Text(l('translateWord')),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildMessagePanel(String Function(String) l, ThemeData theme) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.45,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+            ),
+            child: Consumer<ChatProvider>(
+              builder: (context, cp, _) {
+                final count = cp.messages.length;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.keyboard_arrow_up, size: 16,
+                        color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${count > 0 ? l('messages') : l('noMessages')} ($count)',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: Consumer<ChatProvider>(
+              builder: (context, chatProvider, _) {
+                if (chatProvider.isLoadingMessages &&
+                    chatProvider.messages.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (chatProvider.messages.isEmpty) {
+                  return Center(
+                    child: Text(l('noMessages'),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  );
+                }
+
+                final myId = chatProvider.myId?['id'] as String?;
+
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 4,
+                  ),
+                  itemCount: chatProvider.messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = chatProvider.messages[index];
+                    final isMe = msg.senderId == myId;
+                    return _MessageBubble(message: msg, isMe: isMe);
+                  },
+                );
+              },
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              border: Border(
+                top: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              12, 8, 12, MediaQuery.of(context).padding.bottom + 8,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _messageController,
+                    decoration: InputDecoration(
+                      hintText: l('typeMessage'),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10,
+                      ),
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainerHighest,
+                    ),
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendTextMessage(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton.filled(
+                  onPressed: _sendTextMessage,
+                  icon: const Icon(Icons.send),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CallControlButton extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _CallControlButton({
+    required this.icon,
+    required this.color,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingActionButton.small(
+      heroTag: null,
+      onPressed: onPressed,
+      backgroundColor: color.withValues(alpha: 0.8),
+      child: Icon(icon, color: Colors.white),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  final ChatMessage message;
+  final bool isMe;
+
+  const _MessageBubble({required this.message, required this.isMe});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          Flexible(
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.78,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                color: isMe
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isMe ? 18 : 4),
+                  bottomRight: Radius.circular(isMe ? 4 : 18),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(message.text,
+                    style: TextStyle(
+                      color: isMe
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  if (message.confidenceScore != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${(message.confidenceScore! * 100).toStringAsFixed(0)}%',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isMe
+                            ? theme.colorScheme.onPrimary
+                                .withValues(alpha: 0.7)
+                            : theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 2),
+                  Text(
+                    _formatTime(message.createdAt),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isMe
+                          ? theme.colorScheme.onPrimary
+                              .withValues(alpha: 0.6)
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dt) {
+    return '${dt.hour.toString().padLeft(2, '0')}:'
+        '${dt.minute.toString().padLeft(2, '0')}';
+  }
+}

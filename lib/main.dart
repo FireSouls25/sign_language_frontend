@@ -8,8 +8,9 @@ import 'providers/auth_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/locale_provider.dart';
 import 'providers/translation_mode_provider.dart';
+import 'providers/chat_provider.dart';
 import 'screens/login_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/main_screen.dart';
 import 'services/deep_link_service.dart';
 import 'services/error_translator.dart';
 
@@ -64,6 +65,10 @@ class _LSCTranslatorAppState extends State<LSCTranslatorApp> {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => TranslationModeProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, ChatProvider>(
+          create: (context) => ChatProvider(context.read<AuthProvider>().apiService),
+          update: (_, auth, previous) => previous ?? ChatProvider(auth.apiService),
+        ),
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(
         builder: (context, themeProvider, localeProvider, child) {
@@ -158,7 +163,7 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (auth.isAuthenticated) {
-          return const HomeScreen();
+          return const MainScreen();
         }
 
         return const LoginScreen();

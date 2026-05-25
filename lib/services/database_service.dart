@@ -2,6 +2,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/log.dart';
 import '../models/translation.dart';
+import '../models/chat.dart';
 
 class DatabaseService {
   static final DatabaseService _instance = DatabaseService._internal();
@@ -21,7 +22,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'app_data.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE logs(
@@ -42,11 +43,47 @@ class DatabaseService {
             is_favorite INTEGER DEFAULT 0
           )
         ''');
+        await db.execute('''
+          CREATE TABLE messages(
+            id TEXT,
+            conversation_id TEXT NOT NULL,
+            sender_id TEXT NOT NULL,
+            text TEXT NOT NULL,
+            video_url TEXT,
+            audio_url TEXT,
+            confidence_score REAL,
+            message_type TEXT DEFAULT 'translation',
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (id, conversation_id)
+          )
+        ''');
+        await db.execute(
+          'CREATE INDEX idx_messages_conv ON messages(conversation_id, created_at)',
+        );
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute(
             'ALTER TABLE offline_translations ADD COLUMN is_favorite INTEGER DEFAULT 0',
+          );
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+            CREATE TABLE messages(
+              id TEXT,
+              conversation_id TEXT NOT NULL,
+              sender_id TEXT NOT NULL,
+              text TEXT NOT NULL,
+              video_url TEXT,
+              audio_url TEXT,
+              confidence_score REAL,
+              message_type TEXT DEFAULT 'translation',
+              created_at TEXT NOT NULL,
+              PRIMARY KEY (id, conversation_id)
+            )
+          ''');
+          await db.execute(
+            'CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, created_at)',
           );
         }
       },
@@ -189,5 +226,49 @@ class DatabaseService {
       whereArgs: ['%$query%'],
       orderBy: 'created_at DESC',
     );
+  }
+
+  Future<void> saveMessages(List<ChatMessage> msgs) async {
+    final db = await database;
+    final batch = db.batch();
+    for (final m in msgs) {
+      batch.insert(
+        'messages',
+        {
+          'id': m.id,
+          'conversation_id': m.conversationId,
+          'sender_id': m.senderId,
+          'text': m.text,
+          'video_url': m.videoUrl,
+          'audio_url': m.audioUrl,
+          'confidence_score': m.confidenceScore,
+          'message_type': m.messageType,
+          'created_at': m.createdAt.toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> saveMessage(ChatMessage m) async {
+    await saveMessages([m]);
+  }
+
+  Future<List<ChatMessage>> getMessages(String conversationId, {int limit = 100}) async {
+    final db = await database;
+    final rows = await db.query(
+      'messages',
+      where: 'conversation_id = ?',
+      whereArgs: [conversationId],
+      orderBy: 'created_at ASC',
+      limit: limit,
+    );
+    return rows.map((r) => ChatMessage.fromJson(r)).toList();
+  }
+
+  Future<void> deleteConversationMessages(String conversationId) async {
+    final db = await database;
+    await db.delete('messages', where: 'conversation_id = ?', whereArgs: [conversationId]);
   }
 }

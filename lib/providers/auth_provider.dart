@@ -9,7 +9,7 @@ import '../services/secure_storage_service.dart';
 import '../services/error_translator.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final ApiService _apiService = ApiService();
+  final ApiService apiService = ApiService();
   final SecureStorageService _secureStorage = SecureStorageService();
 
   User? _user;
@@ -32,7 +32,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> handleOAuthCallback(OAuthTokens tokens) async {
     _accessToken = tokens.accessToken;
     _refreshToken = tokens.refreshToken;
-    _apiService.setToken(_accessToken!);
+    apiService.setToken(_accessToken!);
 
     await _saveTokens();
     await fetchCurrentUser();
@@ -46,11 +46,11 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final tokens = await _apiService.exchangeGoogleToken(googleIdToken);
+      final tokens = await apiService.exchangeGoogleToken(googleIdToken);
 
       _accessToken = tokens.accessToken;
       _refreshToken = tokens.refreshToken;
-      _apiService.setToken(_accessToken!);
+      apiService.setToken(_accessToken!);
 
       await _saveTokens();
       await fetchCurrentUser();
@@ -85,7 +85,7 @@ class AuthProvider extends ChangeNotifier {
       _isVoiceEnabled = prefs.getBool('is_voice_enabled') ?? true;
 
       if (_accessToken != null) {
-        _apiService.setToken(_accessToken!);
+        apiService.setToken(_accessToken!);
         await fetchCurrentUser();
       }
     } catch (e) {
@@ -108,7 +108,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _updateAccessToken(String token) async {
     _accessToken = token;
-    _apiService.setToken(token);
+    apiService.setToken(token);
     await _secureStorage.saveAccessToken(token);
   }
 
@@ -121,7 +121,7 @@ class AuthProvider extends ChangeNotifier {
 
     _isRefreshing = true;
     try {
-      final tokens = await _apiService.refreshTokens(_refreshToken!);
+      final tokens = await apiService.refreshTokens(_refreshToken!);
       await _updateAccessToken(tokens.accessToken);
       _refreshToken = tokens.refreshToken;
       await _saveTokens();
@@ -165,7 +165,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _apiService.register(
+      await apiService.register(
         email: email,
         username: username,
         password: password,
@@ -206,14 +206,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final tokens = await _apiService.login(
+      final tokens = await apiService.login(
         username: username,
         password: password,
       );
 
       _accessToken = tokens.accessToken;
       _refreshToken = tokens.refreshToken;
-      _apiService.setToken(_accessToken!);
+      apiService.setToken(_accessToken!);
 
       await _saveTokens();
       await fetchCurrentUser();
@@ -253,7 +253,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       _accessToken = tokens.accessToken;
       _refreshToken = tokens.refreshToken;
-      _apiService.setToken(_accessToken!);
+      apiService.setToken(_accessToken!);
 
       await _saveTokens();
       await fetchCurrentUser();
@@ -289,7 +289,7 @@ class AuthProvider extends ChangeNotifier {
     if (_accessToken == null) return;
 
     try {
-      _user = await _apiService.getCurrentUser();
+      _user = await apiService.getCurrentUser();
       notifyListeners();
     } catch (e) {
       ErrorTranslator.translate(e);
@@ -306,13 +306,13 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     try {
-      await _apiService.logout();
+      await apiService.logout();
     } catch (_) {}
 
     _user = null;
     _accessToken = null;
     _refreshToken = null;
-    _apiService.clearToken();
+    apiService.clearToken();
     await _clearTokens();
     notifyListeners();
   }
@@ -338,7 +338,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await _apiService.changePassword(
+      await apiService.changePassword(
         currentPassword: currentPassword,
         newPassword: newPassword,
       );
