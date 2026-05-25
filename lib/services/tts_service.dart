@@ -37,7 +37,7 @@ class TtsService {
         modelDir.createSync(recursive: true);
       }
 
-      final files = ['es_ES-carlfm-x_low.onnx', 'es_ES-carlfm-x_low.onnx.json'];
+      final files = ['es_ES-davefx-medium.onnx', 'es_ES-davefx-medium.onnx.json'];
 
       for (final fileName in files) {
         final assetPath = 'assets/piper_models/es_ES/$fileName';
@@ -55,7 +55,7 @@ class TtsService {
 
       _modelDir = modelDir.path;
 
-      final configPath = p.join(_modelDir, 'es_ES-carlfm-x_low.onnx.json');
+      final configPath = p.join(_modelDir, 'es_ES-davefx-medium.onnx.json');
       final configFile = File(configPath);
       if (configFile.existsSync()) {
         final config = jsonDecode(configFile.readAsStringSync());
@@ -63,7 +63,7 @@ class TtsService {
         debugPrint('TTS: Model sample rate: $_sampleRate Hz');
       }
 
-      final modelPath = p.join(_modelDir, 'es_ES-carlfm-x_low.onnx');
+      final modelPath = p.join(_modelDir, 'es_ES-davefx-medium.onnx');
 
       _tts = PiperTtsPlugin();
       await _tts!.loadViaPath(modelPath: modelPath, configPath: configPath);
