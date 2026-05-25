@@ -6,6 +6,7 @@ import '../providers/translation_mode_provider.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
 import 'logs_screen.dart';
+import 'login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -180,9 +181,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onPressed: () async {
                         await authProvider.logout();
                         if (mounted) {
-                          Navigator.of(
-                            context,
-                          ).popUntil((route) => route.isFirst);
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => const LoginScreen(),
+                            ),
+                            (route) => false,
+                          );
                         }
                       },
                       icon: const Icon(Icons.logout),
