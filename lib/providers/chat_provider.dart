@@ -66,6 +66,19 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  void setPreloadedData({
+    required List<ConversationModel> conversations,
+    required List<ContactModel> contacts,
+    ConversationModel? selfConversation,
+  }) {
+    _conversations = conversations.where((c) => !c.isSelf).toList();
+    _contacts = contacts;
+    if (selfConversation != null) {
+      _selfConversation = selfConversation;
+    }
+    notifyListeners();
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();
@@ -86,7 +99,9 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _conversations = await _apiService.getConversations();
+      _conversations = (await _apiService.getConversations())
+          .where((c) => !c.isSelf)
+          .toList();
     } catch (e) {
       _error = 'Failed to load conversations';
       ErrorTranslator.translate(e);
