@@ -8,6 +8,7 @@ import '../services/oauth_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/error_translator.dart';
 import '../services/data_loader_service.dart';
+import '../models/chat.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService apiService = ApiService();
@@ -282,9 +283,29 @@ class AuthProvider extends ChangeNotifier {
         return;
       }
 
-      final loader = DataLoaderService(apiService);
-      loader.loadAll(_user!.id);
-      yield* loader.stateStream;
+      yield LoadState(stage: LoadStage.conversations);
+
+      final results = await Future.wait([
+        apiService.getConversations(),
+        apiService.getContacts(),
+      ]);
+
+      final conversations = results[0] as List<ConversationModel>;
+      final contacts = results[1] as List<ContactModel>;
+
+      ConversationModel? selfConv;
+      try {
+        selfConv = await apiService.createConversation(_user!.id);
+      } catch (_) {
+        selfConv = conversations.where((c) => c.isSelf).firstOrNull;
+      }
+
+      yield LoadState(
+        stage: LoadStage.done,
+        conversations: conversations,
+        contacts: contacts,
+        selfConversation: selfConv,
+      );
     } on ApiException catch (e) {
       _error = e.message;
       notifyListeners();
