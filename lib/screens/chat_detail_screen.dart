@@ -27,7 +27,6 @@ class ChatDetailScreen extends StatefulWidget {
 }
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
-  final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final TranslationWebSocketService _translateWs = TranslationWebSocketService();
   final WebRTCService _webrtc = WebRTCService();
@@ -39,18 +38,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _isHandDetectorInitialized = false;
   bool _isCameraInitialized = false;
   bool _isTranslating = false;
-  String _currentTranslation = '';
-  double _confidence = 0.0;
   int _frameCounter = 0;
-  static const int _framesToProcess = 3;
+  static const int _framesToProcess = 5;
   Timer? _frameTimer;
   StreamSubscription? _translationSub;
   StreamSubscription? _errorSub;
   StreamSubscription? _signalingSub;
+  StreamSubscription? _callEventSub;
   StreamSubscription<CallState>? _callStateSub;
   StreamSubscription<MediaStream?>? _remoteStreamSub;
 
   bool _isVideoCall = false;
+  bool _isCallRinging = false;
   bool _isMicEnabled = true;
   bool _isCameraEnabled = true;
 
@@ -99,16 +98,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
       _translationSub = _translateWs.translationStream.listen((result) {
         if (!mounted) return;
-        String text = '';
         if (result.isFinalized) {
-          text = result.text.replaceAll('"', '').trim();
-        }
-        if (text.isNotEmpty) {
-          setState(() {
-            _currentTranslation = text;
-            _confidence = result.confidence;
-          });
-          HapticFeedback.lightImpact();
+          final text = result.text.replaceAll('"', '').trim();
+          if (text.isNotEmpty) {
+            HapticFeedback.lightImpact();
+            context.read<ChatProvider>().sendMessage(
+              widget.conversation.id,
+              text: text,
+              confidenceScore: result.confidence,
+            );
+          }
         }
       });
 
@@ -125,10 +124,37 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void _initSignaling() {
     final chatProvider = context.read<ChatProvider>();
 
-    _signalingSub = chatProvider.signalWs.signalingStream.listen((data) {
+    _callEventSub = chatProvider.signalWs.callEventStream.listen((data) {
+      if (!mounted) return;
       final type = data['type'] as String?;
       final fromId = data['from_id'] as String?;
+      if (fromId == null) return;
 
+      switch (type) {
+        case 'call_request':
+          _showIncomingCallDialog(fromId);
+          break;
+        case 'call_response':
+          final accepted = data['accepted'] as bool? ?? false;
+          if (accepted) {
+            _startWebRTCOffer();
+          } else {
+            if (mounted) {
+              setState(() => _isCallRinging = false);
+              final l = (String key) => AppTranslations.text(context, key);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${widget.conversation.otherUser.displayName} ${l('callDeclined')}')),
+              );
+            }
+          }
+          break;
+      }
+    });
+
+    _signalingSub = chatProvider.signalWs.signalingStream.listen((data) {
+      if (!mounted) return;
+      final type = data['type'] as String?;
+      final fromId = data['from_id'] as String?;
       if (fromId == null) return;
 
       switch (type) {
@@ -143,6 +169,35 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           break;
       }
     });
+  }
+
+  void _showIncomingCallDialog(String fromId) {
+    final l = (String key) => AppTranslations.text(context, key);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(l('incomingCall')),
+        content: Text('${widget.conversation.otherUser.displayName} ${l('incomingCallDesc')}'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<ChatProvider>().signalWs.sendCallResponse(fromId, false);
+            },
+            child: Text(l('decline')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.read<ChatProvider>().signalWs.sendCallResponse(fromId, true);
+              _initWebRTC();
+            },
+            child: Text(l('accept')),
+          ),
+        ],
+      ),
+    );
   }
 
   void _initWebRTC() {
@@ -170,11 +225,19 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _startVideoCall() async {
+    if (_isCallRinging) return;
+    final chatProvider = context.read<ChatProvider>();
+    chatProvider.signalWs.sendCallRequest(widget.conversation.otherUser.id);
+    setState(() => _isCallRinging = true);
+  }
+
+  Future<void> _startWebRTCOffer() async {
     _initWebRTC();
     final success = await _webrtc.startCall();
     if (mounted && success) {
       setState(() {
         _isVideoCall = true;
+        _isCallRinging = false;
         _localRenderer.srcObject = _webrtc.localStream;
       });
     }
@@ -246,8 +309,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     setState(() {
       _isTranslating = true;
-      _currentTranslation = '';
-      _confidence = 0.0;
     });
 
     _cameraController!.startImageStream((CameraImage image) async {
@@ -309,17 +370,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (_translateWs.isConnected) _translateWs.sendFinalize();
   }
 
-  void _sendTextMessage() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty) return;
-
-    context.read<ChatProvider>().sendMessage(
-          widget.conversation.id,
-          text: text,
-        );
-    _messageController.clear();
-  }
-
   @override
   void dispose() {
     _cameraController?.stopImageStream();
@@ -329,6 +379,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _translationSub?.cancel();
     _errorSub?.cancel();
     _signalingSub?.cancel();
+    _callEventSub?.cancel();
     _callStateSub?.cancel();
     _remoteStreamSub?.cancel();
     _translateWs.dispose();
@@ -337,9 +388,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       _localRenderer.dispose();
       _remoteRenderer.dispose();
     }
-    _messageController.dispose();
-    _scrollController.dispose();
     context.read<ChatProvider>().disconnectSignal();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -378,11 +428,23 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 actions: widget.isSelfChat
                     ? null
                     : [
-                        IconButton(
-                          icon: const Icon(Icons.videocam),
-                          onPressed: _startVideoCall,
-                          tooltip: l('videoCall'),
-                        ),
+                        if (_isCallRinging)
+                          IconButton(
+                            icon: const Icon(Icons.call_end, color: Colors.red),
+                            onPressed: () {
+                              context.read<ChatProvider>().signalWs.sendCallResponse(
+                                widget.conversation.otherUser.id, false,
+                              );
+                              setState(() => _isCallRinging = false);
+                            },
+                            tooltip: l('endCall'),
+                          )
+                        else
+                          IconButton(
+                            icon: const Icon(Icons.videocam),
+                            onPressed: _startVideoCall,
+                            tooltip: l('videoCall'),
+                          ),
                       ],
               ),
         body: Center(
@@ -432,9 +494,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     children: [
                       Text(other.displayName, style: const TextStyle(fontSize: 16)),
                       Text(
-                        _isVideoCall ? l('onCall') : '@${other.username}',
+                        _isCallRinging
+                            ? l('ringing')
+                            : _isVideoCall
+                                ? l('onCall')
+                                : '@${other.username}',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: _isVideoCall
+                          color: _isVideoCall || _isCallRinging
                               ? Colors.green
                               : theme.colorScheme.onSurfaceVariant,
                         ),
@@ -447,12 +513,24 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               actions: widget.isSelfChat
                   ? null
                   : [
-                      IconButton(
-                        icon: Icon(_isVideoCall ? Icons.call_end : Icons.videocam),
-                        color: _isVideoCall ? Colors.red : null,
-                        onPressed: _isVideoCall ? _endVideoCall : _startVideoCall,
-                        tooltip: _isVideoCall ? l('endCall') : l('videoCall'),
-                      ),
+                      if (_isCallRinging)
+                        IconButton(
+                          icon: const Icon(Icons.call_end, color: Colors.red),
+                          onPressed: () {
+                            context.read<ChatProvider>().signalWs.sendCallResponse(
+                              widget.conversation.otherUser.id, false,
+                            );
+                            setState(() => _isCallRinging = false);
+                          },
+                          tooltip: l('endCall'),
+                        )
+                      else
+                        IconButton(
+                          icon: Icon(_isVideoCall ? Icons.call_end : Icons.videocam),
+                          color: _isVideoCall ? Colors.red : null,
+                          onPressed: _isVideoCall ? _endVideoCall : _startVideoCall,
+                          tooltip: _isVideoCall ? l('endCall') : l('videoCall'),
+                        ),
                     ],
             ),
       body: Row(
@@ -566,8 +644,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
           child: Stack(
             children: [
               if (_isCameraInitialized && _cameraController != null)
-                ClipRRect(
-                  child: CameraPreview(_cameraController!),
+                RepaintBoundary(
+                  child: ClipRRect(
+                    child: CameraPreview(_cameraController!),
+                  ),
                 )
               else
                 Center(
@@ -593,92 +673,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         color: Colors.white, size: 20),
                   ),
                 ),
-              if (_currentTranslation.isNotEmpty)
-                Positioned(
-                  bottom: 0, left: 0, right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.7),
-                        ],
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_currentTranslation,
-                          style: const TextStyle(
-                            color: Colors.white, fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          '${(_confidence * 100).toStringAsFixed(0)}%',
-                          style: TextStyle(
-                            color: _confidence >= 0.7
-                                ? Colors.greenAccent
-                                : Colors.orangeAccent,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
-        if (_isTranslating)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _stopTranslation,
-                    icon: const Icon(Icons.close, size: 18),
-                    label: Text(l('cancelTranslating')),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _finalizeTranslation,
-                    icon: const Icon(Icons.check, size: 18),
-                    label: Text(l('finalizeTranslating')),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.primary,
-                      foregroundColor: theme.colorScheme.onPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _startTranslation,
-                icon: const Icon(Icons.translate, size: 18),
-                label: Text(l('translateWord')),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.primary,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -729,7 +726,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                if (chatProvider.messages.isEmpty) {
+                final msgs = chatProvider.messages;
+                if (msgs.isEmpty) {
                   return Center(
                     child: Text(l('noMessages'),
                       style: theme.textTheme.bodyMedium?.copyWith(
@@ -746,9 +744,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12, vertical: 4,
                   ),
-                  itemCount: chatProvider.messages.length,
+                  itemCount: msgs.length,
                   itemBuilder: (context, index) {
-                    final msg = chatProvider.messages[index];
+                    final msg = msgs[index];
                     final isMe = msg.senderId == myId;
                     return _MessageBubble(message: msg, isMe: isMe);
                   },
@@ -756,46 +754,56 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
               },
             ),
           ),
-          if (!widget.isSelfChat)
-            Container(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                border: Border(
-                  top: BorderSide(color: theme.colorScheme.outlineVariant),
-                ),
-              ),
-              padding: EdgeInsets.fromLTRB(
-                12, 8, 12, MediaQuery.of(context).padding.bottom + 8,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: InputDecoration(
-                        hintText: l('typeMessage'),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10,
-                        ),
-                        filled: true,
-                        fillColor: theme.colorScheme.surfaceContainerHighest,
-                      ),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendTextMessage(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _sendTextMessage,
-                    icon: const Icon(Icons.send),
-                  ),
-                ],
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              12, 8, 12, MediaQuery.of(context).padding.bottom + 8,
+            ),
+            child: _buildTranslateControls(l),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTranslateControls(String Function(String) l) {
+    if (_isTranslating) {
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _stopTranslation,
+              icon: const Icon(Icons.close, size: 18),
+              label: Text(l('cancelTranslating')),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.grey,
               ),
             ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _finalizeTranslation,
+              icon: const Icon(Icons.check, size: 18),
+              label: Text(l('finalizeTranslating')),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              ),
+            ),
+          ),
         ],
+      );
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _startTranslation,
+        icon: const Icon(Icons.translate, size: 18),
+        label: Text(l('translateWord')),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        ),
       ),
     );
   }

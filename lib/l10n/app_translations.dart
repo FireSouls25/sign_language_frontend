@@ -148,6 +148,12 @@ class AppTranslations {
       'deleteConversation': 'Eliminar conversación',
       'deleteConversationConfirm': '¿Eliminar conversación con',
       'dictionary': 'Diccionario',
+      'incomingCall': 'Llamada entrante',
+      'incomingCallDesc': 'está llamando...',
+      'accept': 'Aceptar',
+      'decline': 'Rechazar',
+      'callDeclined': 'rechazó la llamada',
+      'ringing': 'Llamando...',
     },
     'en': {
       'appTitle': 'LSC Translator',
@@ -200,7 +206,6 @@ class AppTranslations {
       'appSettings': 'App Settings',
       'appearance': 'Appearance',
       'dictionary': 'Dictionary',
-    },
       'changeTheme': 'Change the appearance of the app',
       'themeButtonInAppBar': 'Theme Button in AppBar',
       'themeButtonInAppBarDesc': 'Show button to change mode in top bar',
@@ -292,6 +297,12 @@ class AppTranslations {
       'chatSettingsDesc': 'Font size in chats',
       'deleteConversation': 'Delete conversation',
       'deleteConversationConfirm': 'Delete conversation with',
+      'incomingCall': 'Incoming Call',
+      'incomingCallDesc': 'is calling...',
+      'accept': 'Accept',
+      'decline': 'Decline',
+      'callDeclined': 'declined the call',
+      'ringing': 'Ringing...',
     },
   };
 

@@ -14,12 +14,14 @@ class SignalWebSocketService {
   final _signalingController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
   final _errorController = StreamController<Map<String, dynamic>>.broadcast();
+  final _callEventController = StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<ChatMessage> get messageStream => _messageController.stream;
   Stream<Map<String, dynamic>> get userEventStream => _userEventController.stream;
   Stream<Map<String, dynamic>> get signalingStream => _signalingController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
   Stream<Map<String, dynamic>> get errorStream => _errorController.stream;
+  Stream<Map<String, dynamic>> get callEventStream => _callEventController.stream;
 
   bool _isConnecting = false;
   bool get isConnecting => _isConnecting;
@@ -191,6 +193,13 @@ class SignalWebSocketService {
           }
           break;
 
+        case 'call_request':
+        case 'call_response':
+          if (!_callEventController.isClosed) {
+            _callEventController.add(data);
+          }
+          break;
+
         default:
           debugPrint('[SignalWS] Unknown message type: $type');
       }
@@ -268,6 +277,23 @@ class SignalWebSocketService {
     }));
   }
 
+  void sendCallRequest(String targetId) {
+    if (_channel == null || !_isConnected) return;
+    _channel!.sink.add(jsonEncode({
+      'type': 'call_request',
+      'target_id': targetId,
+    }));
+  }
+
+  void sendCallResponse(String targetId, bool accepted) {
+    if (_channel == null || !_isConnected) return;
+    _channel!.sink.add(jsonEncode({
+      'type': 'call_response',
+      'target_id': targetId,
+      'accepted': accepted,
+    }));
+  }
+
   Future<void> disconnect() async {
     _isDisconnecting = true;
     _reconnectTimer?.cancel();
@@ -300,5 +326,6 @@ class SignalWebSocketService {
     _signalingController.close();
     _connectionController.close();
     _errorController.close();
+    _callEventController.close();
   }
 }
