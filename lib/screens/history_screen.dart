@@ -214,10 +214,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
-        color: Colors.red,
+        color: AppTheme.getDangerColor(context),
         child: Icon(
           Icons.delete,
-          color: Theme.of(context).colorScheme.onPrimary,
+          color: AppTheme.getOnPrimary(context),
         ),
       ),
       onDismissed: (_) async {
@@ -277,7 +277,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: _getConfidenceColor(translation.confidenceScore),
+                      color: _getConfidenceColor(context, translation.confidenceScore),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -298,10 +298,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Color _getConfidenceColor(double confidence) {
-    if (confidence >= 0.8) return Colors.green;
-    if (confidence >= 0.6) return Colors.orange;
-    return Colors.red;
+  Color _getConfidenceColor(BuildContext context, double confidence) {
+    if (confidence >= 0.8) return AppTheme.getSuccessColor(context);
+    if (confidence >= 0.6) return AppTheme.getWarningColor(context);
+    return AppTheme.getDangerColor(context);
   }
 
   String _formatDate(DateTime date) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
+import '../widgets/ls_app_bar.dart';
 
 class ChatSettingsScreen extends StatefulWidget {
   const ChatSettingsScreen({super.key});
@@ -16,10 +17,9 @@ class _ChatSettingsScreenState extends State<ChatSettingsScreen> {
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('chatSettings')),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+      appBar: LSAppBar(
+        title: l('chatSettings'),
+        showLanguageSelector: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),

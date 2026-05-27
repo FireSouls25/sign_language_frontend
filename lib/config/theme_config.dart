@@ -12,8 +12,7 @@ class AppTheme {
   }
 
   static Color getTextTertiary(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return isDark ? Colors.grey[500]! : Colors.grey[500]!;
+    return Colors.grey[500]!;
   }
 
   static Color getSurfaceColor(BuildContext context) {
@@ -42,12 +41,80 @@ class AppTheme {
     return Theme.of(context).colorScheme.surface;
   }
 
+  static Color getPrimary(BuildContext context) {
+    return Theme.of(context).colorScheme.primary;
+  }
+
+  static Color getOnPrimary(BuildContext context) {
+    return Theme.of(context).colorScheme.onPrimary;
+  }
+
+  static Color getPrimaryContainer(BuildContext context) {
+    return Theme.of(context).colorScheme.primaryContainer;
+  }
+
+  static Color getOnPrimaryContainer(BuildContext context) {
+    return Theme.of(context).colorScheme.onPrimaryContainer;
+  }
+
+  static Color getOnSurfaceVariant(BuildContext context) {
+    return Theme.of(context).colorScheme.onSurfaceVariant;
+  }
+
+  static Color getSurfaceContainerHighest(BuildContext context) {
+    return Theme.of(context).colorScheme.surfaceContainerHighest;
+  }
+
+  static Color getOutline(BuildContext context) {
+    return Theme.of(context).colorScheme.outline;
+  }
+
+  static Color getOutlineVariant(BuildContext context) {
+    return Theme.of(context).colorScheme.outlineVariant;
+  }
+
   static Color getErrorColor(BuildContext context) {
     return Theme.of(context).colorScheme.error;
   }
 
   static Color getSuccessColor(BuildContext context) {
     return Colors.green;
+  }
+
+  static Color getWarningColor(BuildContext context) {
+    return Colors.orange;
+  }
+
+  static Color getDangerColor(BuildContext context) {
+    return Colors.red;
+  }
+
+  static Color getOverlayDark() {
+    return Colors.black54;
+  }
+
+  static Color getFullScreenDark() {
+    return Colors.black;
+  }
+
+  static Color getConnectionActive() {
+    return Colors.greenAccent;
+  }
+
+  static Color getConnectionWarning() {
+    return Colors.orange;
+  }
+
+  static Color getConnectionOffline() {
+    return Colors.red;
+  }
+
+  static Color getGrey() {
+    return Colors.grey;
+  }
+
+  static Color getWhite() {
+    return Colors.white;
   }
 
   static List<Color> availableSeedColors = [

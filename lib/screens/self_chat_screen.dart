@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
+import '../widgets/ls_app_bar.dart';
 import 'chat_detail_screen.dart';
 
 class SelfChatScreen extends StatefulWidget {
@@ -41,9 +42,9 @@ class _SelfChatScreenState extends State<SelfChatScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(l('selfChat')),
-          centerTitle: true,
+        appBar: LSAppBar(
+          title: l('selfChat'),
+          showLanguageSelector: true,
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -54,9 +55,9 @@ class _SelfChatScreenState extends State<SelfChatScreen> {
 
     if (selfConv == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: Text(l('selfChat')),
-          centerTitle: true,
+        appBar: LSAppBar(
+          title: l('selfChat'),
+          showLanguageSelector: true,
         ),
         body: Center(
           child: Column(

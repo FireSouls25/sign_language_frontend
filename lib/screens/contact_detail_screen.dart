@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
+import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 import '../models/chat.dart';
 
 class ContactDetailScreen extends StatefulWidget {
@@ -23,10 +25,9 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
     final initial = (name.isNotEmpty ? name[0] : '?').toUpperCase();
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('contactInfo')),
-        backgroundColor: theme.colorScheme.primary,
-        foregroundColor: theme.colorScheme.onPrimary,
+      appBar: LSAppBar(
+        title: l('contactInfo'),
+        showLanguageSelector: true,
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
@@ -100,8 +101,8 @@ class _ContactDetailScreenState extends State<ContactDetailScreen> {
                 icon: const Icon(Icons.person_remove_outlined),
                 label: Text(l('removeContact')),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.red,
-                  side: const BorderSide(color: Colors.red),
+                  foregroundColor: AppTheme.getDangerColor(context),
+                  side: BorderSide(color: AppTheme.getDangerColor(context)),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),

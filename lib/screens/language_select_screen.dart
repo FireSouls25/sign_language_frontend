@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_translations.dart';
+import '../widgets/ls_app_bar.dart';
 
 class LanguageSelectScreen extends StatefulWidget {
   const LanguageSelectScreen({super.key});
@@ -40,10 +41,9 @@ class _LanguageSelectScreenState extends State<LanguageSelectScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('selectLanguage')),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+      appBar: LSAppBar(
+        title: l('selectLanguage'),
+        showThemeToggle: false,
       ),
       body: Column(
         children: [

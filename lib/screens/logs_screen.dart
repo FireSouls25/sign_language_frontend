@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../services/database_service.dart';
 import '../models/log.dart';
 import '../l10n/app_translations.dart';
+import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
@@ -41,10 +43,9 @@ class _LogsScreenState extends State<LogsScreen> {
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('systemLogsTitle')),
-        backgroundColor: Colors.grey[800],
-        foregroundColor: Colors.white,
+      appBar: LSAppBar(
+        title: l('systemLogsTitle'),
+        showThemeToggle: false,
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_sweep),
@@ -62,9 +63,9 @@ class _LogsScreenState extends State<LogsScreen> {
               itemBuilder: (context, index) {
                 final log = _logs[index];
                 return ExpansionTile(
-                  leading: const Icon(
+                  leading: Icon(
                     Icons.bug_report,
-                    color: Colors.redAccent,
+                    color: AppTheme.getDangerColor(context),
                   ),
                   title: Text(
                     log.message,
@@ -80,9 +81,9 @@ class _LogsScreenState extends State<LogsScreen> {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.grey[100],
+                          color: AppTheme.getSurfaceColor(context),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
+                          border: Border.all(color: AppTheme.getDividerColor(context)),
                         ),
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
@@ -91,7 +92,7 @@ class _LogsScreenState extends State<LogsScreen> {
                             style: TextStyle(
                               fontFamily: 'monospace',
                               fontSize: 12,
-                              color: Colors.red[900],
+                              color: AppTheme.getDangerColor(context),
                             ),
                           ),
                         ),

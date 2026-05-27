@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/auth_provider.dart';
 import '../l10n/app_translations.dart';
+import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 import '../models/chat.dart';
 import '../services/translation_websocket_service.dart';
 import '../services/webrtc_service.dart';
@@ -400,53 +402,58 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final other = widget.conversation.otherUser;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
 
+    final _titleWidget = widget.isSelfChat
+        ? null
+        : Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppTheme.getPrimaryContainer(context),
+                child: Text(
+                  (other.displayName.isNotEmpty
+                          ? other.displayName[0]
+                          : other.username[0])
+                      .toUpperCase(),
+                  style: TextStyle(
+                    color: AppTheme.getOnPrimaryContainer(context),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(other.displayName, style: const TextStyle(fontSize: 16)),
+            ],
+          );
+
+    final _chatActions = widget.isSelfChat
+        ? null
+        : [
+            if (_isCallRinging)
+              IconButton(
+                icon: Icon(Icons.call_end, color: AppTheme.getDangerColor(context)),
+                onPressed: () {
+                  context.read<ChatProvider>().signalWs.sendCallResponse(
+                    widget.conversation.otherUser.id, false,
+                  );
+                  setState(() => _isCallRinging = false);
+                },
+                tooltip: l('endCall'),
+              )
+            else
+              IconButton(
+                icon: const Icon(Icons.videocam),
+                onPressed: _startVideoCall,
+                tooltip: l('videoCall'),
+              ),
+          ];
+
     if (!isLandscape) {
       return Scaffold(
-        appBar: widget.isSelfChat
-            ? AppBar(title: Text(l('selfChat')), centerTitle: true)
-            : AppBar(
-                title: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: theme.colorScheme.primaryContainer,
-                      child: Text(
-                        (other.displayName.isNotEmpty
-                                ? other.displayName[0]
-                                : other.username[0])
-                            .toUpperCase(),
-                        style: TextStyle(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(other.displayName, style: const TextStyle(fontSize: 16)),
-                  ],
-                ),
-                centerTitle: false,
-                actions: widget.isSelfChat
-                    ? null
-                    : [
-                        if (_isCallRinging)
-                          IconButton(
-                            icon: const Icon(Icons.call_end, color: Colors.red),
-                            onPressed: () {
-                              context.read<ChatProvider>().signalWs.sendCallResponse(
-                                widget.conversation.otherUser.id, false,
-                              );
-                              setState(() => _isCallRinging = false);
-                            },
-                            tooltip: l('endCall'),
-                          )
-                        else
-                          IconButton(
-                            icon: const Icon(Icons.videocam),
-                            onPressed: _startVideoCall,
-                            tooltip: l('videoCall'),
-                          ),
-                      ],
-              ),
+        appBar: LSAppBar(
+          title: widget.isSelfChat ? l('selfChat') : other.displayName,
+          titleWidget: _titleWidget,
+          showThemeToggle: false,
+          actions: _chatActions,
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -469,70 +476,75 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: widget.isSelfChat
-          ? AppBar(title: Text(l('selfChat')), centerTitle: true)
-          : AppBar(
-              title: Row(
-                children: [
-                  CircleAvatar(
-                    backgroundColor: theme.colorScheme.primaryContainer,
-                    child: Text(
-                      (other.displayName.isNotEmpty
-                              ? other.displayName[0]
-                              : other.username[0])
-                          .toUpperCase(),
-                      style: TextStyle(
-                        color: theme.colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+    final _landscapeTitleWidget = widget.isSelfChat
+        ? null
+        : Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: AppTheme.getPrimaryContainer(context),
+                child: Text(
+                  (other.displayName.isNotEmpty
+                          ? other.displayName[0]
+                          : other.username[0])
+                      .toUpperCase(),
+                  style: TextStyle(
+                    color: AppTheme.getOnPrimaryContainer(context),
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(other.displayName, style: const TextStyle(fontSize: 16)),
-                      Text(
-                        _isCallRinging
-                            ? l('ringing')
-                            : _isVideoCall
-                                ? l('onCall')
-                                : '@${other.username}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: _isVideoCall || _isCallRinging
-                              ? Colors.green
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(other.displayName, style: const TextStyle(fontSize: 16)),
+                  Text(
+                    _isCallRinging
+                        ? l('ringing')
+                        : _isVideoCall
+                            ? l('onCall')
+                            : '@${other.username}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: _isVideoCall || _isCallRinging
+                          ? AppTheme.getSuccessColor(context)
+                          : AppTheme.getOnSurfaceVariant(context),
+                    ),
                   ),
                 ],
               ),
-              centerTitle: false,
-              actions: widget.isSelfChat
-                  ? null
-                  : [
-                      if (_isCallRinging)
-                        IconButton(
-                          icon: const Icon(Icons.call_end, color: Colors.red),
-                          onPressed: () {
-                            context.read<ChatProvider>().signalWs.sendCallResponse(
-                              widget.conversation.otherUser.id, false,
-                            );
-                            setState(() => _isCallRinging = false);
-                          },
-                          tooltip: l('endCall'),
-                        )
-                      else
-                        IconButton(
-                          icon: Icon(_isVideoCall ? Icons.call_end : Icons.videocam),
-                          color: _isVideoCall ? Colors.red : null,
-                          onPressed: _isVideoCall ? _endVideoCall : _startVideoCall,
-                          tooltip: _isVideoCall ? l('endCall') : l('videoCall'),
-                        ),
-                    ],
-            ),
+            ],
+          );
+
+    final _landscapeActions = widget.isSelfChat
+        ? null
+        : [
+            if (_isCallRinging)
+              IconButton(
+                icon: Icon(Icons.call_end, color: AppTheme.getDangerColor(context)),
+                onPressed: () {
+                  context.read<ChatProvider>().signalWs.sendCallResponse(
+                    widget.conversation.otherUser.id, false,
+                  );
+                  setState(() => _isCallRinging = false);
+                },
+                tooltip: l('endCall'),
+              )
+            else
+              IconButton(
+                icon: Icon(_isVideoCall ? Icons.call_end : Icons.videocam),
+                color: _isVideoCall ? AppTheme.getDangerColor(context) : null,
+                onPressed: _isVideoCall ? _endVideoCall : _startVideoCall,
+                tooltip: _isVideoCall ? l('endCall') : l('videoCall'),
+              ),
+          ];
+
+    return Scaffold(
+      appBar: LSAppBar(
+        title: widget.isSelfChat ? l('selfChat') : other.displayName,
+        titleWidget: widget.isSelfChat ? null : _landscapeTitleWidget,
+        showThemeToggle: false,
+        actions: _landscapeActions,
+      ),
       body: Row(
         children: [
           Expanded(child: _buildCameraArea(l, theme, other)),

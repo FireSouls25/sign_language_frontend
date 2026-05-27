@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 import 'login_screen.dart';
 import 'visual_settings_screen.dart';
 import 'preferences_screen.dart';
@@ -23,9 +24,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('myProfile')),
-        centerTitle: true,
+      appBar: LSAppBar(
+        title: l('myProfile'),
+        showLanguageSelector: true,
       ),
       body: user == null
           ? const Center(child: CircularProgressIndicator())
@@ -133,11 +134,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                       icon: const Icon(Icons.logout),
                       label: Text(l('logout')),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.getDangerColor(context),
+                      side: BorderSide(color: AppTheme.getDangerColor(context)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
                     ),
                   ),
                 ],

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../l10n/app_translations.dart';
+import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 import 'main_screen.dart';
 
@@ -193,7 +194,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           padding: const EdgeInsets.only(bottom: 16),
                           child: Text(
                             auth.error!,
-                            style: const TextStyle(color: Colors.red),
+                            style: TextStyle(color: AppTheme.getDangerColor(context)),
                             textAlign: TextAlign.center,
                           ),
                         );

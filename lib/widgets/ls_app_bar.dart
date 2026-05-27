@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../config/theme_config.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../screens/language_select_screen.dart';
 
 class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
+  final Widget? titleWidget;
   final List<Widget>? actions;
   final bool showConnectionIndicator;
   final bool? isConnected;
@@ -19,6 +21,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   const LSAppBar({
     super.key,
     required this.title,
+    this.titleWidget,
     this.actions,
     this.showConnectionIndicator = false,
     this.isConnected,
@@ -40,9 +43,11 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     final themeProvider = context.watch<ThemeProvider>();
     context.watch<LocaleProvider>();
 
-    Widget? titleWidget;
-    if (showConnectionIndicator && isConnected != null) {
-      titleWidget = Row(
+    Widget? resolvedTitle;
+    if (titleWidget != null) {
+      resolvedTitle = titleWidget;
+    } else if (showConnectionIndicator && isConnected != null) {
+      resolvedTitle = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(title),
@@ -53,8 +58,8 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: isConnected!
-                  ? Colors.greenAccent
-                  : (isConnecting == true ? Colors.orange : Colors.red),
+                  ? AppTheme.getConnectionActive()
+                  : (isConnecting == true ? AppTheme.getConnectionWarning() : AppTheme.getConnectionOffline()),
             ),
           ),
         ],
@@ -103,7 +108,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     }
 
     return AppBar(
-      title: titleWidget ?? Text(title),
+      title: resolvedTitle ?? Text(title),
       leading: leading,
       automaticallyImplyLeading: automaticallyImplyLeading,
       centerTitle: true,

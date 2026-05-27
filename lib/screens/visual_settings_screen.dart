@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 
 class VisualSettingsScreen extends StatefulWidget {
   const VisualSettingsScreen({super.key});
@@ -17,8 +18,9 @@ class _VisualSettingsScreenState extends State<VisualSettingsScreen> {
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('visualSettings')),
+      appBar: LSAppBar(
+        title: l('visualSettings'),
+        showLanguageSelector: true,
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),

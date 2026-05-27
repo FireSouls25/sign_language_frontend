@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
 import '../models/chat.dart';
+import '../widgets/ls_app_bar.dart';
 import 'chat_detail_screen.dart';
 import 'contact_detail_screen.dart';
 
@@ -37,9 +38,9 @@ class _ContactListScreenState extends State<ContactListScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_showSearch ? l('searchUsers') : l('contacts')),
-        centerTitle: true,
+      appBar: LSAppBar(
+        title: _showSearch ? l('searchUsers') : l('contacts'),
+        showLanguageSelector: true,
         actions: [
           IconButton(
             icon: Icon(_showSearch ? Icons.close : Icons.search),

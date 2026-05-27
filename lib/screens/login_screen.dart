@@ -7,9 +7,9 @@ import '../l10n/app_translations.dart';
 import '../services/google_auth_service.dart';
 import '../services/deep_link_service.dart';
 import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 import 'register_screen.dart';
 import 'main_screen.dart';
-import 'language_select_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,25 +38,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('appTitle')),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+      appBar: LSAppBar(
+        title: l('appTitle'),
+        showLanguageSelector: true,
         automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.translate,
-              color: Theme.of(context).colorScheme.onPrimary,
-            ),
-            tooltip: l('selectLanguage'),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const LanguageSelectScreen()),
-              );
-            },
-          ),
-        ],
       ),
       body: SafeArea(
         child: Center(
@@ -141,7 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           padding: const EdgeInsets.only(bottom: 16),
                           child: Text(
                             auth.error!,
-                            style: const TextStyle(color: Colors.red),
+                            style: TextStyle(color: AppTheme.getDangerColor(context)),
                             textAlign: TextAlign.center,
                           ),
                         );

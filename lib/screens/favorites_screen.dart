@@ -7,6 +7,7 @@ import '../services/database_service.dart';
 import '../services/error_translator.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -77,10 +78,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('favorites')),
-        backgroundColor: Colors.redAccent,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+      appBar: LSAppBar(
+        title: l('favorites'),
+        showLanguageSelector: true,
       ),
       body: _buildBody(l),
     );
@@ -159,7 +159,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.favorite, color: Colors.red),
+                  icon: Icon(Icons.favorite, color: AppTheme.getDangerColor(context)),
                   onPressed: () async {
                     setState(() {
                       _favorites.remove(translation);

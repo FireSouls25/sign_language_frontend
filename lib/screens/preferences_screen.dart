@@ -4,6 +4,7 @@ import '../providers/auth_provider.dart';
 import '../providers/translation_mode_provider.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
+import '../widgets/ls_app_bar.dart';
 import 'logs_screen.dart';
 
 class PreferencesScreen extends StatefulWidget {
@@ -19,10 +20,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     final l = (String key) => AppTranslations.text(context, key);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('preferences')),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
+      appBar: LSAppBar(
+        title: l('preferences'),
+        showLanguageSelector: true,
       ),
       body: ListView(
         padding: const EdgeInsets.all(24),

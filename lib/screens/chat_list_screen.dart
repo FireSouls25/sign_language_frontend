@@ -3,9 +3,9 @@ import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
 import '../models/chat.dart';
+import '../widgets/ls_app_bar.dart';
 import 'contact_list_screen.dart';
 import 'chat_detail_screen.dart';
-import 'language_select_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -29,22 +29,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(l('chats')),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.translate),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const LanguageSelectScreen(),
-                ),
-              );
-            },
-            tooltip: l('selectLanguage'),
-          ),
-        ],
+      appBar: LSAppBar(
+        title: l('chats'),
+        showLanguageSelector: true,
       ),
       body: Consumer<ChatProvider>(
         builder: (context, chatProvider, _) {
