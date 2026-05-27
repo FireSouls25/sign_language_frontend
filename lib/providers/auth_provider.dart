@@ -274,7 +274,7 @@ class AuthProvider extends ChangeNotifier {
       await fetchCurrentUser();
 
       if (_user == null) {
-        yield const LoadState(
+        yield LoadState(
           stage: LoadStage.done,
           isError: true,
           error: 'No se pudo obtener el usuario',

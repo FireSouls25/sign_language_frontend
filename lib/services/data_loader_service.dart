@@ -33,7 +33,7 @@ class DataLoaderService {
 
   Future<void> loadAll(String userId) async {
     try {
-      _controller.add(const LoadState(stage: LoadStage.conversations));
+      _controller.add(LoadState(stage: LoadStage.conversations));
 
       final results = await Future.wait([
         _apiService.getConversations(),
