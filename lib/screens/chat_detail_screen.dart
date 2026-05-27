@@ -65,14 +65,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (!widget.isSelfChat) {
       _initRenderers();
     }
-    _initChat();
+    _initChat().then((_) {
+      if (mounted) setState(() => _isInitializing = false);
+    });
     _initCamera();
     _initHandDetector();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) setState(() => _isInitializing = false);
-      });
-    });
   }
 
   Future<void> _initRenderers() async {

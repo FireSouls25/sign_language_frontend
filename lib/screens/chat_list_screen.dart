@@ -15,6 +15,8 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
+  String? _navigatingConversationId;
+
   @override
   void initState() {
     super.initState();
@@ -77,16 +79,23 @@ class _ChatListScreenState extends State<ChatListScreen> {
               itemCount: chatProvider.conversations.length,
               itemBuilder: (context, index) {
                 final conv = chatProvider.conversations[index];
+                final isNavigating = _navigatingConversationId == conv.id;
                 return _ConversationTile(
                   conversation: conv,
+                  isNavigating: isNavigating,
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatDetailScreen(
-                          conversation: conv,
+                    setState(() => _navigatingConversationId = conv.id);
+                    Future.microtask(() {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChatDetailScreen(
+                            conversation: conv,
+                          ),
                         ),
-                      ),
-                    );
+                      ).then((_) {
+                        if (mounted) setState(() => _navigatingConversationId = null);
+                      });
+                    });
                   },
                   onDelete: () {
                     _confirmDeleteConversation(context, conv, l);
@@ -143,11 +152,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
 class _ConversationTile extends StatelessWidget {
   final ConversationModel conversation;
+  final bool isNavigating;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ConversationTile({
     required this.conversation,
+    this.isNavigating = false,
     required this.onTap,
     required this.onDelete,
   });
@@ -161,56 +172,59 @@ class _ConversationTile extends StatelessWidget {
             : other.username[0])
         .toUpperCase();
 
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: theme.colorScheme.primaryContainer,
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: theme.colorScheme.onPrimaryContainer,
-            fontWeight: FontWeight.bold,
+    return Opacity(
+      opacity: isNavigating ? 0.5 : 1.0,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Text(
+            initial,
+            style: TextStyle(
+              color: theme.colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      title: Text(
-        other.displayName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: conversation.lastMessageText != null
-          ? Text(
-              conversation.lastMessageText!,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            )
-          : null,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (conversation.lastMessageAt != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Text(
-                _formatTime(conversation.lastMessageAt!),
-                style: theme.textTheme.bodySmall?.copyWith(
+        title: Text(
+          other.displayName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: conversation.lastMessageText != null
+            ? Text(
+                conversation.lastMessageText!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
+              )
+            : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (conversation.lastMessageAt != null)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  _formatTime(conversation.lastMessageAt!),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline,
+                color: theme.colorScheme.error,
+              ),
+              onPressed: onDelete,
+              tooltip: AppTranslations.text(context, 'deleteConversation'),
             ),
-          IconButton(
-            icon: Icon(
-              Icons.delete_outline,
-              color: theme.colorScheme.error,
-            ),
-            onPressed: onDelete,
-            tooltip: AppTranslations.text(context, 'deleteConversation'),
-          ),
-        ],
+          ],
+        ),
+        onTap: isNavigating ? null : onTap,
       ),
-      onTap: onTap,
     );
   }
 
