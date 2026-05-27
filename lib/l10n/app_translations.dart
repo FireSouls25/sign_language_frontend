@@ -147,6 +147,7 @@ class AppTranslations {
       'chatSettingsDesc': 'Tamaño de fuente en chats',
       'deleteConversation': 'Eliminar conversación',
       'deleteConversationConfirm': '¿Eliminar conversación con',
+      'dictionary': 'Diccionario',
     },
     'en': {
       'appTitle': 'LSC Translator',
@@ -198,6 +199,8 @@ class AppTranslations {
       'personalInfo': 'Personal Information',
       'appSettings': 'App Settings',
       'appearance': 'Appearance',
+      'dictionary': 'Dictionary',
+    },
       'changeTheme': 'Change the appearance of the app',
       'themeButtonInAppBar': 'Theme Button in AppBar',
       'themeButtonInAppBarDesc': 'Show button to change mode in top bar',

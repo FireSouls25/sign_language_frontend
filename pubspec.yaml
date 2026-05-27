@@ -81,6 +81,7 @@ flutter:
   assets:
     - .env
     - assets/piper_models/es_ES/
+    - assets/letters/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

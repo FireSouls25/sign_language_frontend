@@ -5,6 +5,7 @@ import '../l10n/app_translations.dart';
 import 'chat_list_screen.dart';
 import 'self_chat_screen.dart';
 import 'profile_screen.dart';
+import 'dictionary_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -24,6 +25,7 @@ class _MainScreenState extends State<MainScreen> {
     _screens = [
       const ChatListScreen(),
       const SelfChatScreen(),
+      const DictionaryScreen(),
       const ProfileScreen(),
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
@@ -63,6 +65,11 @@ class _MainScreenState extends State<MainScreen> {
             icon: const Icon(Icons.translate_outlined),
             selectedIcon: const Icon(Icons.translate),
             label: l('translate'),
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.menu_book_outlined),
+            selectedIcon: const Icon(Icons.menu_book),
+            label: l('dictionary'),
           ),
           NavigationDestination(
             icon: const Icon(Icons.person_outline),
