@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/oauth_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/error_translator.dart';
+import '../services/data_loader_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiService apiService = ApiService();
@@ -172,7 +173,7 @@ class AuthProvider extends ChangeNotifier {
         fullName: fullName,
       );
 
-      return await login(username: username, password: password);
+      return await _loginInternal(username: username, password: password);
     } on ApiException catch (e) {
       _error = e.message;
       _isLoading = false;
@@ -198,6 +199,13 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> login({
+    required String username,
+    required String password,
+  }) {
+    return _loginInternal(username: username, password: password);
+  }
+
+  Future<bool> _loginInternal({
     required String username,
     required String password,
   }) async {
@@ -242,6 +250,58 @@ class AuthProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return false;
+    }
+  }
+
+  Stream<LoadState> loginStream({
+    required String username,
+    required String password,
+  }) async* {
+    _error = null;
+    notifyListeners();
+
+    try {
+      final tokens = await apiService.login(
+        username: username,
+        password: password,
+      );
+
+      _accessToken = tokens.accessToken;
+      _refreshToken = tokens.refreshToken;
+      apiService.setToken(_accessToken!);
+
+      await _saveTokens();
+      await fetchCurrentUser();
+
+      if (_user == null) {
+        yield const LoadState(
+          stage: LoadStage.done,
+          isError: true,
+          error: 'No se pudo obtener el usuario',
+        );
+        return;
+      }
+
+      final loader = DataLoaderService(apiService);
+      loader.loadAll(_user!.id);
+      yield* loader.stateStream;
+    } on ApiException catch (e) {
+      _error = e.message;
+      notifyListeners();
+      yield LoadState(stage: LoadStage.done, isError: true, error: e.message);
+    } on SocketException {
+      _error = 'No hay conexión a internet. Verifica tu red.';
+      notifyListeners();
+      yield LoadState(stage: LoadStage.done, isError: true, error: _error);
+    } on TimeoutException {
+      _error = 'El servidor no responde. Intenta más tarde.';
+      notifyListeners();
+      yield LoadState(stage: LoadStage.done, isError: true, error: _error);
+    } catch (e) {
+      ErrorTranslator.translate(e);
+      _error = 'Error de conexión. Verifica tu internet.';
+      notifyListeners();
+      yield LoadState(stage: LoadStage.done, isError: true, error: _error);
     }
   }
 
