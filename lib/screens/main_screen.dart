@@ -28,14 +28,9 @@ class _MainScreenState extends State<MainScreen> {
       const DictionaryScreen(),
       const ProfileScreen(),
     ];
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadData());
-  }
-
-  void _loadData() {
-    final chatProvider = context.read<ChatProvider>();
-    chatProvider.loadMyId();
-    chatProvider.loadConversations();
-    chatProvider.loadContacts();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ChatProvider>().loadMyId();
+    });
   }
 
   @override
