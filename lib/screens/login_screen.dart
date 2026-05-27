@@ -214,6 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
               contacts: state.contacts!,
               selfConversation: state.selfConversation,
             );
+            chatProvider.preloadMessages(state.conversations!);
           }
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const MainScreen()),

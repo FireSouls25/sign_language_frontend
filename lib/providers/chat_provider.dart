@@ -16,6 +16,7 @@ class ChatProvider extends ChangeNotifier {
   List<ConversationModel> _conversations = [];
   List<ContactModel> _contacts = [];
   List<ChatMessage> _messages = [];
+  final Map<String, List<ChatMessage>> _messagesCache = {};
   List<UserBrief> _searchResults = [];
   Map<String, dynamic>? _myId;
   ConversationModel? _selfConversation;
@@ -77,6 +78,16 @@ class ChatProvider extends ChangeNotifier {
       _selfConversation = selfConversation;
     }
     notifyListeners();
+  }
+
+  Future<void> preloadMessages(List<ConversationModel> conversations) async {
+    final futures = conversations.take(3).map((c) async {
+      try {
+        final history = await _apiService.getMessages(c.id);
+        _messagesCache[c.id] = history.items;
+      } catch (_) {}
+    });
+    await Future.wait(futures);
   }
 
   void clearError() {
@@ -203,6 +214,13 @@ class ChatProvider extends ChangeNotifier {
     _isLoadingMessages = true;
     notifyListeners();
 
+    if (_messagesCache.containsKey(conversationId)) {
+      _messages = _messagesCache[conversationId]!;
+      _isLoadingMessages = false;
+      notifyListeners();
+      return;
+    }
+
     try {
       final local = await _db.getMessages(conversationId);
       if (local.isNotEmpty) {
@@ -212,6 +230,7 @@ class ChatProvider extends ChangeNotifier {
 
       final history = await _apiService.getMessages(conversationId);
       _messages = history.items;
+      _messagesCache[conversationId] = history.items;
       await _db.saveMessages(history.items);
     } catch (e) {
       if (_messages.isEmpty) {
