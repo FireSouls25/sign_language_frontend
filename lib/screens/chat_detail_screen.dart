@@ -13,6 +13,7 @@ import '../widgets/ls_app_bar.dart';
 import '../models/chat.dart';
 import '../services/translation_websocket_service.dart';
 import '../services/webrtc_service.dart';
+import '../services/tts_service.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final ConversationModel conversation;
@@ -55,6 +56,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _isMicEnabled = true;
   bool _isCameraEnabled = true;
   bool _isInitializing = true;
+  final TtsService _tts = TtsService();
 
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
@@ -70,6 +72,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
     _initCamera();
     _initHandDetector();
+    _tts.initialize('es_ES');
   }
 
   Future<void> _initRenderers() async {
@@ -773,7 +776,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   itemBuilder: (context, index) {
                     final msg = msgs[index];
                     final isMe = msg.senderId == myId;
-                    return _MessageBubble(message: msg, isMe: isMe);
+                    return _MessageBubble(
+                      message: msg,
+                      isMe: isMe,
+                      onSpeak: () => _tts.speak(msg.text),
+                    );
                   },
                 );
               },
@@ -859,8 +866,13 @@ class _CallControlButton extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isMe;
+  final VoidCallback onSpeak;
 
-  const _MessageBubble({required this.message, required this.isMe});
+  const _MessageBubble({
+    required this.message,
+    required this.isMe,
+    required this.onSpeak,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -894,26 +906,32 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(message.text,
-                    style: TextStyle(
-                      color: isMe
-                          ? theme.colorScheme.onPrimary
-                          : theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  if (message.confidenceScore != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      '${(message.confidenceScore! * 100).toStringAsFixed(0)}%',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isMe
-                            ? theme.colorScheme.onPrimary
-                                .withValues(alpha: 0.7)
-                            : theme.colorScheme.onSurfaceVariant,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(message.text,
+                          style: TextStyle(
+                            color: isMe
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurface,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      GestureDetector(
+                        onTap: onSpeak,
+                        child: Icon(
+                          Icons.volume_up,
+                          size: 16,
+                          color: isMe
+                              ? theme.colorScheme.onPrimary
+                                  .withValues(alpha: 0.7)
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 2),
                   Text(
                     _formatTime(message.createdAt),
