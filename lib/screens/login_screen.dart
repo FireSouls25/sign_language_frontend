@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/chat_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_translations.dart';
-import '../services/google_auth_service.dart';
-import '../services/deep_link_service.dart';
+import '../services/data_loader_service.dart';
 import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 import 'register_screen.dart';
@@ -23,12 +23,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  final _googleAuthService = GoogleAuthService();
+  StreamSubscription<LoadState>? _loginSub;
 
   @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
+    _loginSub?.cancel();
     super.dispose();
   }
 
@@ -134,58 +135,23 @@ class _LoginScreenState extends State<LoginScreen> {
                       return const SizedBox.shrink();
                     },
                   ),
-                  Consumer<AuthProvider>(
-                    builder: (context, auth, _) {
-                      return ElevatedButton(
-                        onPressed: auth.isLoading ? null : _login,
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimary,
-                        ),
-                        child: auth.isLoading
-                            ? SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onPrimary,
-                                ),
-                              )
-                            : Text(
-                                l('loginButton'),
-                                style: const TextStyle(fontSize: 16),
-                              ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(l('or')),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: _loginWithGoogle,
-                    icon: const Icon(Icons.g_mobiledata, size: 24),
-                    label: Text(l('continueWithGoogle')),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                  ElevatedButton(
+                    onPressed: _login,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primary,
+                      foregroundColor: Theme.of(
+                        context,
+                      ).colorScheme.onPrimary,
+                    ),
+                    child: Text(
+                      l('loginButton'),
+                      style: const TextStyle(fontSize: 16),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).push(
@@ -208,33 +174,52 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _login() async {
     if (!_formKey.currentState!.validate()) return;
 
+    _loginSub?.cancel();
+
     final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.login(
+    final chatProvider = context.read<ChatProvider>();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 24),
+              const Expanded(child: Text('Iniciando sesión...')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final stream = authProvider.loginStream(
       username: _usernameController.text.trim(),
       password: _passwordController.text,
     );
 
-    if (success && mounted) {
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const MainScreen()));
-    }
-  }
-
-  Future<void> _loginWithGoogle() async {
-    final authProvider = context.read<AuthProvider>();
-
-    final sub = DeepLinkService().onOAuthCallback.listen((tokens) async {
-      final success = await authProvider.loginWithOAuth(tokens);
-      if (success && mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const MainScreen()),
-        );
+    _loginSub = stream.listen((state) {
+      if (!mounted) return;
+      if (state.stage == LoadStage.done) {
+        Navigator.of(context).pop();
+        if (state.isError) {
+          setState(() {});
+        } else {
+          if (state.conversations != null && state.contacts != null) {
+            chatProvider.setPreloadedData(
+              conversations: state.conversations!,
+              contacts: state.contacts!,
+              selfConversation: state.selfConversation,
+            );
+          }
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainScreen()),
+          );
+        }
       }
     });
-
-    await _googleAuthService.signIn();
-
-    Future.delayed(const Duration(minutes: 5), () => sub.cancel());
   }
 }
