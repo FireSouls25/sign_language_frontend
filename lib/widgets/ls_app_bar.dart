@@ -4,6 +4,8 @@ import '../config/theme_config.dart';
 import '../providers/theme_provider.dart';
 import '../providers/locale_provider.dart';
 import '../screens/language_select_screen.dart';
+import '../screens/instructions_screen.dart';
+import '../l10n/app_translations.dart';
 
 class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
@@ -16,6 +18,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
   final bool automaticallyImplyLeading;
   final bool showThemeToggle;
   final bool showLanguageSelector;
+  final bool showHelp;
   final double toolbarHeight;
 
   const LSAppBar({
@@ -30,6 +33,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.automaticallyImplyLeading = true,
     this.showThemeToggle = true,
     this.showLanguageSelector = false,
+    this.showHelp = true,
     this.toolbarHeight = kToolbarHeight,
   });
 
@@ -42,6 +46,7 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     final isDark = theme.brightness == Brightness.dark;
     final themeProvider = context.watch<ThemeProvider>();
     context.watch<LocaleProvider>();
+    final l = (String key) => AppTranslations.text(context, key);
 
     Widget? resolvedTitle;
     if (titleWidget != null) {
@@ -69,6 +74,24 @@ class LSAppBar extends StatelessWidget implements PreferredSizeWidget {
     List<Widget>? allActions = actions != null
         ? List<Widget>.from(actions!)
         : null;
+
+    if (showHelp) {
+      final helpButton = IconButton(
+        icon: const Icon(Icons.help_outline, color: Colors.white),
+        tooltip: l('help'),
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const InstructionsScreen()),
+          );
+        },
+      );
+
+      if (allActions == null) {
+        allActions = [helpButton];
+      } else {
+        allActions.add(helpButton);
+      }
+    }
 
     if (showLanguageSelector) {
       final languageButton = IconButton(
