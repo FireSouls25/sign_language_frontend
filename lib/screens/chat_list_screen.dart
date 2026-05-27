@@ -15,8 +15,6 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  String? _navigatingConversationId;
-
   @override
   void initState() {
     super.initState();
@@ -79,21 +77,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
               itemCount: chatProvider.conversations.length,
               itemBuilder: (context, index) {
                 final conv = chatProvider.conversations[index];
-                final isNavigating = _navigatingConversationId == conv.id;
                 return _ConversationTile(
                   conversation: conv,
-                  isNavigating: isNavigating,
                   onTap: () {
-                    setState(() => _navigatingConversationId = conv.id);
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => ChatDetailScreen(
                           conversation: conv,
                         ),
                       ),
-                    ).then((_) {
-                      if (mounted) setState(() => _navigatingConversationId = null);
-                    });
+                    );
                   },
                   onDelete: () {
                     _confirmDeleteConversation(context, conv, l);
@@ -150,13 +143,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
 class _ConversationTile extends StatelessWidget {
   final ConversationModel conversation;
-  final bool isNavigating;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ConversationTile({
     required this.conversation,
-    this.isNavigating = false,
     required this.onTap,
     required this.onDelete,
   });
@@ -171,31 +162,16 @@ class _ConversationTile extends StatelessWidget {
         .toUpperCase();
 
     return ListTile(
-      leading: isNavigating
-          ? SizedBox(
-              width: 40,
-              height: 40,
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ),
-            )
-          : CircleAvatar(
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Text(
-                initial,
-                style: TextStyle(
-                  color: theme.colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
+      leading: CircleAvatar(
+        backgroundColor: theme.colorScheme.primaryContainer,
+        child: Text(
+          initial,
+          style: TextStyle(
+            color: theme.colorScheme.onPrimaryContainer,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
       title: Text(
         other.displayName,
         maxLines: 1,
@@ -211,39 +187,30 @@ class _ConversationTile extends StatelessWidget {
               ),
             )
           : null,
-      trailing: isNavigating
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: theme.colorScheme.primary,
-              ),
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (conversation.lastMessageAt != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Text(
-                      _formatTime(conversation.lastMessageAt!),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                IconButton(
-                  icon: Icon(
-                    Icons.delete_outline,
-                    color: theme.colorScheme.error,
-                  ),
-                  onPressed: onDelete,
-                  tooltip: AppTranslations.text(context, 'deleteConversation'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (conversation.lastMessageAt != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                _formatTime(conversation.lastMessageAt!),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
-              ],
+              ),
             ),
-      onTap: isNavigating ? null : onTap,
+          IconButton(
+            icon: Icon(
+              Icons.delete_outline,
+              color: theme.colorScheme.error,
+            ),
+            onPressed: onDelete,
+            tooltip: AppTranslations.text(context, 'deleteConversation'),
+          ),
+        ],
+      ),
+      onTap: onTap,
     );
   }
 

@@ -54,6 +54,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _isCallRinging = false;
   bool _isMicEnabled = true;
   bool _isCameraEnabled = true;
+  bool _isInitializing = true;
 
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
@@ -67,6 +68,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _initChat();
     _initCamera();
     _initHandDetector();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) setState(() => _isInitializing = false);
+      });
+    });
   }
 
   Future<void> _initRenderers() async {
@@ -401,6 +407,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final theme = Theme.of(context);
     final other = widget.conversation.otherUser;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (_isInitializing) {
+      return Scaffold(
+        appBar: LSAppBar(
+          title: widget.isSelfChat ? l('selfChat') : other.displayName,
+          showThemeToggle: false,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     final _titleWidget = widget.isSelfChat
         ? null
