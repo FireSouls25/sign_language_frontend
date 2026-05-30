@@ -9,7 +9,6 @@ import '../services/data_loader_service.dart';
 import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
 import 'register_screen.dart';
-import 'main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -216,9 +215,6 @@ class _LoginScreenState extends State<LoginScreen> {
             );
             chatProvider.preloadMessages(state.conversations!);
           }
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainScreen()),
-          );
         }
       }
     });

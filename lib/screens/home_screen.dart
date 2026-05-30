@@ -6,6 +6,7 @@ import 'package:hand_landmarker/hand_landmarker.dart';
 import 'package:provider/provider.dart';
 import '../services/tts_service.dart';
 import '../providers/auth_provider.dart';
+import '../providers/chat_provider.dart';
 import '../providers/translation_mode_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_translations.dart';
@@ -237,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             errorMsg.toLowerCase().contains('auth') ||
             errorMsg.toLowerCase().contains('unauthorized')) {
           debugPrint('[HomeScreen] Auth error detected in WS, logging out');
+          context.read<ChatProvider>().clear();
           context.read<AuthProvider>().logout();
           return;
         }
@@ -261,6 +263,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             errStr.contains('token') ||
             errStr.contains('auth')) {
           debugPrint('[HomeScreen] Auth error in WS connection, logging out');
+          context.read<ChatProvider>().clear();
           context.read<AuthProvider>().logout();
           return;
         }

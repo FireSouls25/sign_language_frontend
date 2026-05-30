@@ -90,6 +90,23 @@ class ChatProvider extends ChangeNotifier {
     await Future.wait(futures);
   }
 
+  void clear() {
+    disconnectSignal();
+    _conversations = [];
+    _contacts = [];
+    _messages = [];
+    _messagesCache.clear();
+    _searchResults = [];
+    _myId = null;
+    _selfConversation = null;
+    _error = null;
+    _isLoadingConversations = false;
+    _isLoadingContacts = false;
+    _isLoadingMessages = false;
+    _isSearching = false;
+    notifyListeners();
+  }
+
   void clearError() {
     _error = null;
     notifyListeners();
@@ -250,6 +267,25 @@ class ChatProvider extends ChangeNotifier {
     String? audioUrl,
     double? confidenceScore,
   }) async {
+    final senderId = _myId?['id'] as String? ?? '';
+
+    final localMsg = ChatMessage(
+      id: 'pending_${DateTime.now().millisecondsSinceEpoch}',
+      conversationId: conversationId,
+      senderId: senderId,
+      text: text,
+      videoUrl: videoUrl,
+      audioUrl: audioUrl,
+      confidenceScore: confidenceScore,
+      messageType: 'translation',
+      createdAt: DateTime.now(),
+    );
+
+    if (_activeConversationId == conversationId) {
+      _messages.add(localMsg);
+      notifyListeners();
+    }
+
     try {
       final msg = await _apiService.sendMessage(
         conversationId,
@@ -258,13 +294,17 @@ class ChatProvider extends ChangeNotifier {
         audioUrl: audioUrl,
         confidenceScore: confidenceScore,
       );
-      _messages.add(msg);
+      final index = _messages.indexOf(localMsg);
+      if (index != -1) {
+        _messages[index] = msg;
+      } else {
+        _messages.add(msg);
+      }
       await _db.saveMessage(msg);
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Failed to send message';
-      notifyListeners();
+      await _db.saveMessage(localMsg);
       return false;
     }
   }
@@ -291,7 +331,27 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void sendViaSignal(String text, {String? videoUrl, String? audioUrl, double? confidenceScore}) {
+  void sendViaSignal(String conversationId, String text, {String? videoUrl, String? audioUrl, double? confidenceScore}) {
+    final senderId = _myId?['id'] as String? ?? '';
+
+    final localMsg = ChatMessage(
+      id: 'pending_${DateTime.now().millisecondsSinceEpoch}',
+      conversationId: conversationId,
+      senderId: senderId,
+      text: text,
+      videoUrl: videoUrl,
+      audioUrl: audioUrl,
+      confidenceScore: confidenceScore,
+      messageType: 'translation',
+      createdAt: DateTime.now(),
+    );
+
+    if (_activeConversationId == conversationId) {
+      _messages.add(localMsg);
+      _db.saveMessage(localMsg);
+      notifyListeners();
+    }
+
     signalWs.sendTranslation(
       text: text,
       videoUrl: videoUrl,

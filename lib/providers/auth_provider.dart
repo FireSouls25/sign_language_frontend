@@ -20,11 +20,12 @@ class AuthProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isInitialized = false;
   bool _isRefreshing = false;
+  bool _isLoggingIn = false;
   String? _error;
   bool _isVoiceEnabled = true;
 
   User? get user => _user;
-  bool get isAuthenticated => _accessToken != null;
+  bool get isAuthenticated => _accessToken != null && !_isLoggingIn;
   bool get isLoading => _isLoading && !_isInitialized;
   bool get isInitialized => _isInitialized;
   String? get error => _error;
@@ -259,7 +260,7 @@ class AuthProvider extends ChangeNotifier {
     required String password,
   }) async* {
     _error = null;
-    notifyListeners();
+    _isLoggingIn = true;
 
     try {
       final tokens = await apiService.login(
@@ -272,9 +273,12 @@ class AuthProvider extends ChangeNotifier {
       apiService.setToken(_accessToken!);
 
       await _saveTokens();
-      await fetchCurrentUser();
+
+      _user = await apiService.getCurrentUser();
 
       if (_user == null) {
+        _isLoggingIn = false;
+        notifyListeners();
         yield LoadState(
           stage: LoadStage.done,
           isError: true,
@@ -300,25 +304,32 @@ class AuthProvider extends ChangeNotifier {
         selfConv = conversations.where((c) => c.isSelf).firstOrNull;
       }
 
+      _isLoggingIn = false;
+
       yield LoadState(
         stage: LoadStage.done,
         conversations: conversations,
         contacts: contacts,
         selfConversation: selfConv,
       );
+      notifyListeners();
     } on ApiException catch (e) {
+      _isLoggingIn = false;
       _error = e.message;
       notifyListeners();
       yield LoadState(stage: LoadStage.done, isError: true, error: e.message);
     } on SocketException {
+      _isLoggingIn = false;
       _error = 'No hay conexión a internet. Verifica tu red.';
       notifyListeners();
       yield LoadState(stage: LoadStage.done, isError: true, error: _error);
     } on TimeoutException {
+      _isLoggingIn = false;
       _error = 'El servidor no responde. Intenta más tarde.';
       notifyListeners();
       yield LoadState(stage: LoadStage.done, isError: true, error: _error);
     } catch (e) {
+      _isLoggingIn = false;
       ErrorTranslator.translate(e);
       _error = 'Error de conexión. Verifica tu internet.';
       notifyListeners();

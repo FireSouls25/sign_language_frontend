@@ -123,6 +123,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         final msg = error['message'] ?? '';
         if (msg.toLowerCase().contains('token') ||
             msg.toLowerCase().contains('auth')) {
+          context.read<ChatProvider>().clear();
           context.read<AuthProvider>().logout();
         }
       });

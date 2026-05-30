@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../providers/chat_provider.dart';
 import '../l10n/app_translations.dart';
 import '../config/theme_config.dart';
 import '../widgets/ls_app_bar.dart';
@@ -114,6 +115,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () async {
+                        context.read<ChatProvider>().clear();
                         await authProvider.logout();
                         if (mounted) {
                           Navigator.of(context).pushAndRemoveUntil(
